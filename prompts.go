@@ -32,5 +32,5 @@ func addSSHConnectionPrompt() (string, error) {
 		return "", err
 	}
 
-	return fmt.Sprintf("%s@%s\t%s\n", username, host, password), nil
+	return fmt.Sprintf("%s@%s\t%s", username, host, password), nil
 }

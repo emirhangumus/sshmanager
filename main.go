@@ -43,7 +43,20 @@ func addSSHConnection(defaultFilePath, keyFilePath string) error {
 		return err
 	}
 
-	err = storeFile(sshConnection, defaultFilePath, key)
+	fileContents, _ := readFile(defaultFilePath, key)
+
+	/**
+	 * If fileContents is not empty, append the new SSH connection details
+	 * to the existing file contents. Otherwise, set the new SSH connection
+	 * details as the file contents.
+	 */
+	if fileContents != "" {
+		fileContents = fileContents + "\n" + sshConnection
+	} else {
+		fileContents = sshConnection
+	}
+
+	err = storeFile(fileContents, defaultFilePath, key)
 	if err != nil {
 		return err
 	}
@@ -53,7 +66,7 @@ func addSSHConnection(defaultFilePath, keyFilePath string) error {
 }
 
 func connToStrSlice(conns map[string]map[string]string) []string {
-	items := []string{"Exit"}
+	items := []string{"Back to main menu"}
 
 	for _, value := range conns {
 		items = append(items, value["username"]+"@"+value["host"])
@@ -96,7 +109,7 @@ func showConnections(defaultFilePath, keyFilePath string) {
 	}
 
 	switch result {
-	case "Exit":
+	case "Back to main menu":
 		return
 	default:
 		err, index := findKeyOfSelectedSSHOption(result, connections)
@@ -105,6 +118,59 @@ func showConnections(defaultFilePath, keyFilePath string) {
 		}
 		conn := connections[index]
 		connectSSH(conn)
+	}
+}
+
+// Remove SSH connection
+func removeSSHConnection(defaultFilePath, keyFilePath string) {
+	connections, err := readAllConnections(defaultFilePath, keyFilePath)
+	if err != nil {
+		fmt.Println("No SSH connections found.")
+		return
+	}
+
+	items := connToStrSlice(connections)
+
+	prompt := promptui.Select{
+		Label: "Select an SSH connection to remove",
+		Items: items,
+	}
+
+	_, result, err := prompt.Run()
+	if err != nil {
+		fmt.Println("Invalid connection selection. Please try again.")
+		return
+	}
+
+	switch result {
+	case "Back to main menu":
+		return
+	default:
+		err, index := findKeyOfSelectedSSHOption(result, connections)
+		if err != nil {
+			return
+		}
+
+		delete(connections, index)
+
+		var newConns []string
+		for _, value := range connections {
+			newConns = append(newConns, value["username"]+"@"+value["host"]+"\t"+value["password"])
+		}
+
+		key, err := loadKey(keyFilePath)
+		if err != nil {
+			fmt.Println("Failed to remove SSH connection.")
+			return
+		}
+
+		err = storeFile(strings.Join(newConns, "\n"), defaultFilePath, key)
+		if err != nil {
+			fmt.Println("Failed to remove SSH connection.")
+			return
+		}
+
+		fmt.Println("SSH connection removed successfully.")
 	}
 }
 
@@ -118,7 +184,7 @@ func main() {
 	defaultFilePath := filepath.Join(homeDir, ".sshmanager", "conn")
 	keyFilePath := filepath.Join(homeDir, ".sshmanager", "secret.key")
 
-	menuOptions := []string{"Exit", "Connect to SSH", "Add SSH Connection"}
+	menuOptions := []string{"Exit", "Connect to SSH", "Add SSH Connection", "Remove SSH Connection"}
 
 	for {
 		prompt := promptui.Select{
@@ -140,6 +206,8 @@ func main() {
 			showConnections(defaultFilePath, keyFilePath)
 		case "Add SSH Connection":
 			addSSHConnection(defaultFilePath, keyFilePath)
+		case "Remove SSH Connection":
+			removeSSHConnection(defaultFilePath, keyFilePath)
 		}
 	}
 }
