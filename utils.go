@@ -110,12 +110,24 @@ func readAllConnections(defaultFilePath, keyFilePath string) (map[string]map[str
 			parts := strings.Split(line, "\t")
 			userHost := strings.Split(parts[0], "@")
 			conndict[fmt.Sprintf("%d", i+1)] = map[string]string{
-				"username": userHost[0],
-				"host":     userHost[1],
-				"password": parts[1],
+				"index":       fmt.Sprintf("%d", i+1),
+				"username":    userHost[0],
+				"host":        userHost[1],
+				"password":    parts[1],
+				"description": parts[2],
 			}
 		}
 	}
 
 	return conndict, nil
+}
+
+func connToStrSlice(conns map[string]map[string]string) []string {
+	items := []string{"Back to main menu"}
+
+	for _, value := range conns {
+		items = append(items, value["index"]+". "+value["username"]+"@"+value["host"]+" - "+value["description"])
+	}
+
+	return items
 }

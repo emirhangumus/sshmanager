@@ -32,7 +32,12 @@ This Go application allows you to manage SSH connections securely using encrypti
    ```
 4. Add the executable to your PATH to run the application from anywhere (Optional)
 
-## Usage
+## Flags
+
+- **--clean**: Clean the saved SSH connections (Inculding the encrypted file)
+  ```bash
+  ./sshmanager --clean
+  ```
 
 ### Add SSH Connection
 

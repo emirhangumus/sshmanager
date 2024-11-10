@@ -2,6 +2,7 @@ package main
 
 import (
 	"errors"
+	"flag"
 	"fmt"
 	"log"
 	"os"
@@ -65,21 +66,11 @@ func addSSHConnection(defaultFilePath, keyFilePath string) error {
 	return nil
 }
 
-func connToStrSlice(conns map[string]map[string]string) []string {
-	items := []string{"Back to main menu"}
-
-	for _, value := range conns {
-		items = append(items, value["username"]+"@"+value["host"])
-	}
-
-	return items
-}
-
 func findKeyOfSelectedSSHOption(choice string, conns map[string]map[string]string) (error, string) {
-	data := strings.Split(choice, "@") // ['username', 'host]
+	index := strings.Split(choice, ".")[0]
 
 	for key, value := range conns {
-		if data[0] == value["username"] && data[1] == value["host"] {
+		if value["index"] == index {
 			return nil, key
 		}
 	}
@@ -184,11 +175,21 @@ func main() {
 	defaultFilePath := filepath.Join(homeDir, ".sshmanager", "conn")
 	keyFilePath := filepath.Join(homeDir, ".sshmanager", "secret.key")
 
+	cleanFlag := flag.Bool("clean", false, "Resets the connections and key file")
+	flag.Parse()
+
+	if *cleanFlag {
+		os.Remove(defaultFilePath)
+		os.Remove(keyFilePath)
+		fmt.Println("Connections and key file have been reset.")
+		return
+	}
+
 	menuOptions := []string{"Exit", "Connect to SSH", "Add SSH Connection", "Remove SSH Connection"}
 
 	for {
 		prompt := promptui.Select{
-			Label: "Menu Options | v0.0.2",
+			Label: "Menu Options | v0.1.0",
 			Items: menuOptions,
 		}
 
