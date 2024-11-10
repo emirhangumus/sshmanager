@@ -34,7 +34,7 @@ This Go application allows you to manage SSH connections securely using encrypti
 
 ## Flags
 
-- **--clean**: Clean the saved SSH connections (Inculding the encrypted file)
+- **--clean**: Clean the saved SSH connections (Including the encrypted file)
   ```bash
   ./sshmanager --clean
   ```
