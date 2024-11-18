@@ -146,7 +146,7 @@ func removeSSHConnection(defaultFilePath, keyFilePath string) {
 
 		var newConns []string
 		for _, value := range connections {
-			newConns = append(newConns, value["username"]+"@"+value["host"]+"\t"+value["password"])
+			newConns = append(newConns, value["username"]+"@"+value["host"]+"\t"+value["password"]+"\t"+value["description"])
 		}
 
 		key, err := loadKey(keyFilePath)
@@ -189,7 +189,7 @@ func main() {
 
 	for {
 		prompt := promptui.Select{
-			Label: "Menu Options | v0.1.1",
+			Label: "Menu Options | v0.1.2",
 			Items: menuOptions,
 		}
 
