@@ -1,75 +1,11 @@
 package main
 
 import (
-	"crypto/rand"
 	"fmt"
 	"os"
 	"path/filepath"
 	"strings"
-
-	"golang.org/x/crypto/nacl/secretbox"
 )
-
-// Generate a key for encryption and decryption
-func generateKey() ([]byte, error) {
-	key := make([]byte, 32)
-	_, err := rand.Read(key)
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
-}
-
-// Load an existing key or create a new one
-func loadKey(filePath string) ([]byte, error) {
-	if _, err := os.Stat(filePath); os.IsNotExist(err) {
-		key, err := generateKey()
-		if err != nil {
-			return nil, err
-		}
-		os.MkdirAll(filepath.Dir(filePath), os.ModePerm)
-		err = os.WriteFile(filePath, key, 0600)
-		if err != nil {
-			return nil, err
-		}
-		return key, nil
-	}
-	key, err := os.ReadFile(filePath)
-	if err != nil {
-		return nil, err
-	}
-	return key, nil
-}
-
-// Encrypt data
-func encryptData(data string, key []byte) ([]byte, error) {
-	var nonce [24]byte
-	_, err := rand.Read(nonce[:])
-	if err != nil {
-		return nil, err
-	}
-
-	var secretKey [32]byte
-	copy(secretKey[:], key[:32])
-
-	encrypted := secretbox.Seal(nonce[:], []byte(data), &nonce, &secretKey)
-	return encrypted, nil
-}
-
-// Decrypt data
-func decryptData(encryptedData, key []byte) (string, error) {
-	var nonce [24]byte
-	copy(nonce[:], encryptedData[:24])
-
-	var secretKey [32]byte
-	copy(secretKey[:], key[:32])
-
-	decrypted, ok := secretbox.Open(nil, encryptedData[24:], &nonce, &secretKey)
-	if !ok {
-		return "", fmt.Errorf("decryption failed")
-	}
-	return string(decrypted), nil
-}
 
 // Store encrypted data to a file
 func storeFile(data, filePath string, key []byte) error {

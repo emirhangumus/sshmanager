@@ -66,16 +66,16 @@ func addSSHConnection(defaultFilePath, keyFilePath string) error {
 	return nil
 }
 
-func findKeyOfSelectedSSHOption(choice string, conns map[string]map[string]string) (error, string) {
+func findKeyOfSelectedSSHOption(choice string, conns map[string]map[string]string) (string, error) {
 	index := strings.Split(choice, ".")[0]
 
 	for key, value := range conns {
 		if value["index"] == index {
-			return nil, key
+			return key, nil
 		}
 	}
 
-	return errors.New("The selected options not in connections"), ""
+	return "", errors.New("the selected options not in connections")
 }
 
 // Show SSH connections and prompt for action
@@ -103,7 +103,7 @@ func showConnections(defaultFilePath, keyFilePath string) {
 	case "Back to main menu":
 		return
 	default:
-		err, index := findKeyOfSelectedSSHOption(result, connections)
+		index, err := findKeyOfSelectedSSHOption(result, connections)
 		if err != nil {
 			return
 		}
@@ -137,7 +137,7 @@ func removeSSHConnection(defaultFilePath, keyFilePath string) {
 	case "Back to main menu":
 		return
 	default:
-		err, index := findKeyOfSelectedSSHOption(result, connections)
+		index, err := findKeyOfSelectedSSHOption(result, connections)
 		if err != nil {
 			return
 		}
@@ -179,9 +179,9 @@ func main() {
 	flag.Parse()
 
 	if *cleanFlag {
-		os.Remove(defaultFilePath)
-		os.Remove(keyFilePath)
-		fmt.Println("Connections and key file have been reset.")
+		secureDelete(defaultFilePath)
+		secureDelete(keyFilePath)
+		fmt.Println("Connections and key file have been securely wiped.")
 		return
 	}
 
@@ -189,7 +189,7 @@ func main() {
 
 	for {
 		prompt := promptui.Select{
-			Label: "Menu Options | v0.1.2",
+			Label: "Menu Options | v0.2.2",
 			Items: menuOptions,
 		}
 
