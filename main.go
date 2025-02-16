@@ -189,7 +189,7 @@ func main() {
 
 	for {
 		prompt := promptui.Select{
-			Label: "Menu Options | v0.2.2",
+			Label: "Menu Options | v0.2.3",
 			Items: menuOptions,
 		}
 

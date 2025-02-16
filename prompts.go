@@ -9,7 +9,7 @@ import (
 
 func validateText(input string) error {
 	if len(input) == 0 {
-		return errors.New("This field is required")
+		return errors.New("this field is required")
 	}
 	return nil
 }

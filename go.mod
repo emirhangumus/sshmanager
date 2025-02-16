@@ -4,7 +4,6 @@ go 1.23.2
 
 require (
 	github.com/manifoldco/promptui v0.9.0
-	golang.org/x/crypto v0.28.0
 )
 
 require (
