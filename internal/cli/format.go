@@ -4,11 +4,12 @@ import (
 	"errors"
 	"fmt"
 
+	"github.com/emirhangumus/sshmanager/internal/prompts"
 	"github.com/emirhangumus/sshmanager/internal/storage"
 )
 
 func ConnToStrSlice(conns []storage.SSHConnection) []string {
-	items := []string{"Back to main menu"}
+	items := []string{prompts.DefaultPromptTexts.BackToMainMenu}
 	for _, conn := range conns {
 		display := fmt.Sprintf("%s. %s@%s - %s", conn.Index, conn.Username, conn.Host, conn.Description)
 		items = append(items, display)
@@ -22,5 +23,5 @@ func GetConnByIndex(index string, conns []storage.SSHConnection) (storage.SSHCon
 			return conn, nil
 		}
 	}
-	return storage.SSHConnection{}, errors.New("connection not found")
+	return storage.SSHConnection{}, errors.New(prompts.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 }

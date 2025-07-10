@@ -7,6 +7,8 @@ import (
 	"fmt"
 	"os"
 	"path/filepath"
+
+	"github.com/emirhangumus/sshmanager/internal/prompts"
 )
 
 // Generate a 32-byte AES key
@@ -62,7 +64,7 @@ func EncryptData(data string, key []byte) ([]byte, error) {
 // DecryptData Decrypt data using AES-GCM
 func DecryptData(encryptedData, key []byte) (string, error) {
 	if len(encryptedData) < 12 {
-		return "", fmt.Errorf("invalid data format")
+		return "", fmt.Errorf(prompts.DefaultPromptTexts.ErrorMessages.InvalidDataFormatX, "encrypted data too short")
 	}
 	nonce, ciphertext := encryptedData[:12], encryptedData[12:]
 	block, err := aes.NewCipher(key)
@@ -75,7 +77,7 @@ func DecryptData(encryptedData, key []byte) (string, error) {
 	}
 	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", fmt.Errorf("decryption failed: %v", err)
+		return "", fmt.Errorf(prompts.DefaultPromptTexts.ErrorMessages.DecryptionDataFailedX, err)
 	}
 	return string(plaintext), nil
 }

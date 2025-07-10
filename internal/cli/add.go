@@ -30,6 +30,6 @@ func HandleAdd(dataPath, keyPath string) error {
 		return err
 	}
 
-	fmt.Println("SSH connection saved.")
+	fmt.Println(prompts.DefaultPromptTexts.SuccessMessages.SSHConnectionSaved)
 	return nil
 }

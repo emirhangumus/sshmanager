@@ -3,6 +3,7 @@ package cli
 import (
 	"fmt"
 
+	"github.com/emirhangumus/sshmanager/internal/prompts"
 	"github.com/manifoldco/promptui"
 )
 
@@ -24,20 +25,20 @@ func ShowMainMenu(dataPath, keyPath string) {
 
 		_, choice, err := prompt.Run()
 		if err != nil {
-			fmt.Println("Invalid selection:", err)
+			fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.InvalidSelectionX, err)
 			continue
 		}
 
 		switch choice {
-		case "Exit":
+		case prompts.DefaultPromptTexts.Exit:
 			return
-		case "Connect to SSH":
+		case prompts.DefaultPromptTexts.ConnectToSSH:
 			HandleConnect(dataPath, keyPath)
-		case "Add SSH Connection":
+		case prompts.DefaultPromptTexts.AddSSHConnection:
 			if err := HandleAdd(dataPath, keyPath); err != nil {
-				fmt.Println("Failed to add:", err)
+				fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.FailedToAddConnectionX, err)
 			}
-		case "Remove SSH Connection":
+		case prompts.DefaultPromptTexts.RemoveSSHConnection:
 			HandleRemove(dataPath, keyPath)
 		}
 	}

@@ -7,6 +7,7 @@ import (
 	"strings"
 	"syscall"
 
+	"github.com/emirhangumus/sshmanager/internal/prompts"
 	"github.com/emirhangumus/sshmanager/internal/storage"
 	"github.com/manifoldco/promptui"
 )
@@ -14,14 +15,14 @@ import (
 func HandleConnect(dataPath, keyPath string) {
 	connections, err := storage.ReadAllConnections(dataPath, keyPath)
 	if err != nil {
-		fmt.Println("No SSH connections found.")
+		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 		return
 	}
 
 	items := ConnToStrSlice(connections)
-	prompt := promptui.Select{Label: "Select an SSH connection", Items: items}
+	prompt := promptui.Select{Label: prompts.DefaultPromptTexts.SelectAnSSHConnection, Items: items}
 	_, result, err := prompt.Run()
-	if err != nil || result == "Back to main menu" {
+	if err != nil || result == prompts.DefaultPromptTexts.BackToMainMenu {
 		return
 	}
 
@@ -38,7 +39,7 @@ func HandleConnect(dataPath, keyPath string) {
 func connect(conn storage.SSHConnection) {
 	sshpassPath, err := exec.LookPath("sshpass")
 	if err != nil {
-		fmt.Println("Error: sshpass not found. Please install it using your package manager.")
+		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.SSHPassNotFound)
 		return
 	}
 
@@ -46,6 +47,6 @@ func connect(conn storage.SSHConnection) {
 	args := []string{"sshpass", "-p", conn.Password, "ssh", sshTarget}
 
 	if err := syscall.Exec(sshpassPath, args, os.Environ()); err != nil {
-		fmt.Printf("Connection to %s failed: %v\n", sshTarget, err)
+		fmt.Printf(prompts.DefaultPromptTexts.ErrorMessages.ConnectionToXFailedX+"\n", sshTarget, err)
 	}
 }

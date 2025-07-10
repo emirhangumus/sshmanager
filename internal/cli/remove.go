@@ -5,6 +5,7 @@ import (
 	"strings"
 
 	"github.com/emirhangumus/sshmanager/internal/encryption"
+	"github.com/emirhangumus/sshmanager/internal/prompts"
 	"github.com/emirhangumus/sshmanager/internal/storage"
 	"github.com/manifoldco/promptui"
 )
@@ -12,14 +13,14 @@ import (
 func HandleRemove(dataPath, keyPath string) {
 	connections, err := storage.ReadAllConnections(dataPath, keyPath)
 	if err != nil || len(connections) == 0 {
-		fmt.Println("No SSH connections found.")
+		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 		return
 	}
 
 	items := ConnToStrSlice(connections)
-	prompt := promptui.Select{Label: "Select a connection to remove", Items: items}
+	prompt := promptui.Select{Label: prompts.DefaultPromptTexts.SelectAConnectionToRemove, Items: items}
 	_, result, err := prompt.Run()
-	if err != nil || result == "Back to main menu" {
+	if err != nil || result == prompts.DefaultPromptTexts.BackToMainMenu {
 		return
 	}
 
@@ -42,14 +43,14 @@ func HandleRemove(dataPath, keyPath string) {
 
 	keyBytes, err := encryption.LoadKey(keyPath)
 	if err != nil {
-		fmt.Println("Error loading encryption key.")
+		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.ErrorLoadingEncryptionKeyX, err)
 		return
 	}
 
 	if err := storage.StoreFile(strings.Join(lines, "\n"), dataPath, keyBytes); err != nil {
-		fmt.Println("Error updating file.")
+		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.FailedToStoreUpdatedConnectionsX, err)
 		return
 	}
 
-	fmt.Println("SSH connection removed.")
+	fmt.Println(prompts.DefaultPromptTexts.SuccessMessages.SSHConnectionRemoved)
 }
