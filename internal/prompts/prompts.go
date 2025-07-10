@@ -1,4 +1,4 @@
-package main
+package prompts
 
 import (
 	"errors"
@@ -14,7 +14,7 @@ func validateText(input string) error {
 	return nil
 }
 
-func addSSHConnectionPrompt() (string, error) {
+func AddSSHConnectionPrompt() (string, error) {
 	prompt := promptui.Prompt{
 		Label:    "Enter Host",
 		Validate: validateText,

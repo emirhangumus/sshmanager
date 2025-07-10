@@ -1,68 +1,97 @@
 # SSH Manager
 
-This Go application allows you to manage SSH connections securely using encryption. You can add SSH connection details, encrypt them, and easily connect to your SSH servers through the command line.
+A secure and simple command-line tool for managing and connecting to SSH servers. SSH Manager stores your SSH connection details using strong encryption and lets you connect to servers with a few keystrokes.
 
 ## Features
 
-- **Add SSH Connections**: Save SSH connection details securely.
-- **Connect to SSH**: Select from saved SSH connections and connect automatically.
-- **Encryption**: All connection details are encrypted using NaCl `secretbox` to ensure security.
+- 🔐 **Encrypted Storage**: Uses NaCl `secretbox` for secure encryption of connection details.
+- ➕ **Add SSH Connections**: Input and securely save SSH server details.
+- ⚡ **Quick Connect**: Automatically connect to saved SSH servers using `sshpass`.
+- 🧹 **Cleanup Option**: Clear all saved (encrypted) SSH connections with a single flag.
 
-## Prerequisites
+## Requirements
 
-- Go 1.19 or higher
-- SSH and SSHPass installed on your system
-  ```bash
-  sudo apt install openssh-client sshpass
-  ```
+- **Go 1.19+**
+- **sshpass**
+- **OpenSSH client**
+
+Install requirements on Debian/Ubuntu:
+```bash
+sudo apt install openssh-client sshpass
+```
 
 ## Installation
 
-1. Clone the repository
-   ```bash
-   git clone https://github.com/emirhangumus/sshmanager.git && cd sshmanager
-   ```
-2. Build the application
-   ```bash
-    go build -o sshmanager
-   ```
-3. Run the application
-   ```bash
-   ./sshmanager
-   ```
-4. Add the executable to your PATH to run the application from anywhere (Optional)
+### 1. Clone the Repository
 
-## Flags
+```bash
+git clone https://github.com/emirhangumus/sshmanager.git
+cd sshmanager
+```
 
-- **--clean**: Clean the saved SSH connections (Including the encrypted file)
+### 2. Build the Binary
+
+```bash
+make build
+```
+
+### 3. (Optional) Install to `~/.local/bin`
+
+```bash
+make install
+```
+
+### 4. Run the App
+
+```bash
+sshmanager
+```
+
+## Usage
+
+### Run the App
+
+```bash
+sshmanager
+```
+
+You'll see a menu with the following options:
+
+* **Add SSH Connection**: Enter host, username, and password (encrypted and saved).
+* **Connect to SSH**: Choose a saved connection to connect instantly.
+
+### Flags
+
+* `--clean` – Remove all saved SSH connections:
+
   ```bash
-  ./sshmanager --clean
+  sshmanager --clean
   ```
 
-### Add SSH Connection
+## File Structure
 
-1. Run the application
-   ```bash
-   ./sshmanager
-   ```
-2. Select `Add SSH Connection`
+Encrypted connection data is saved to:
 
-3. Enter the connection details
+```
+~/.sshmanager/conn
+```
 
-   - **Host**: The hostname or IP address of the SSH server
-   - **Username**: The username to connect to the SSH server
-   - **Password**: The password to connect to the SSH server
+## Makefile Commands
 
-4. The connection details will be encrypted and saved to the `~/.sshmanager/conn` file.
+| Command                   | Description                 |
+| ------------------------- | --------------------------- |
+| `make build`              | Build the binary            |
+| `make build_compressed`   | Build and compress with UPX |
+| `make install`            | Install the binary locally  |
+| `make install_compressed` | Install compressed binary   |
+| `make run`                | Builds and runs the binary  |
+| `make clean`              | Remove build artifacts      |
+| `make remove`             | Remove the installed binary |
 
-### Connect to SSH
+## Security Notes
 
-1. Run the application
-   ```bash
-   ./sshmanager
-   ```
-2. Select `Connect to SSH`
+All SSH connection details are encrypted using `secretbox` (XSalsa20 + Poly1305). Your credentials never leave your machine and are stored in encrypted form only.
 
-3. Select the SSH connection you want to connect to
+## License
 
-4. The application will automatically connect to the SSH server using the saved connection details
+MIT © [emirhangumus](https://github.com/emirhangumus)

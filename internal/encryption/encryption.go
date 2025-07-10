@@ -1,4 +1,4 @@
-package main
+package encryption
 
 import (
 	"crypto/aes"
@@ -19,8 +19,8 @@ func generateKey() ([]byte, error) {
 	return key, nil
 }
 
-// Load or create an encryption key
-func loadKey(filePath string) ([]byte, error) {
+// LoadKey Load or create an encryption key
+func LoadKey(filePath string) ([]byte, error) {
 	if _, err := os.Stat(filePath); os.IsNotExist(err) {
 		key, err := generateKey()
 		if err != nil {
@@ -40,8 +40,8 @@ func loadKey(filePath string) ([]byte, error) {
 	return key, nil
 }
 
-// Encrypt data using AES-GCM
-func encryptData(data string, key []byte) ([]byte, error) {
+// EncryptData Encrypt data using AES-GCM
+func EncryptData(data string, key []byte) ([]byte, error) {
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
@@ -59,8 +59,8 @@ func encryptData(data string, key []byte) ([]byte, error) {
 	return append(nonce, ciphertext...), nil // Prepend nonce for decryption
 }
 
-// Decrypt data using AES-GCM
-func decryptData(encryptedData, key []byte) (string, error) {
+// DecryptData Decrypt data using AES-GCM
+func DecryptData(encryptedData, key []byte) (string, error) {
 	if len(encryptedData) < 12 {
 		return "", fmt.Errorf("invalid data format")
 	}
@@ -80,8 +80,8 @@ func decryptData(encryptedData, key []byte) (string, error) {
 	return string(plaintext), nil
 }
 
-// Securely delete a file by overwriting with random data before removal
-func secureDelete(path string) {
+// SecureDelete Securely delete a file by overwriting with random data before removal
+func SecureDelete(path string) {
 	f, err := os.OpenFile(path, os.O_WRONLY, 0600)
 	if err != nil {
 		return

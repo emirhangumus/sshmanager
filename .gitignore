@@ -1,0 +1,29 @@
+# Binaries
+bin/
+*.exe
+*.out
+*.o
+*.a
+*.so
+*.dll
+
+# OS & Editor junk
+.DS_Store
+Thumbs.db
+*.swp
+*.swo
+*.bak
+
+# Go build cache
+*.test
+*.coverprofile
+
+# IDEs
+.vscode/
+.idea/
+
+# Dependency directories
+vendor/
+
+# Config or encrypted data (only if auto-generated)
+.sshmanager/
