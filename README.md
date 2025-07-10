@@ -97,4 +97,4 @@ All SSH connection details are encrypted using `secretbox` (XSalsa20 + Poly1305)
 
 ## License
 
-MIT © [emirhangumus](https://github.com/emirhangumus)
+Licensed under the [Apache License 2.0](LICENSE).
