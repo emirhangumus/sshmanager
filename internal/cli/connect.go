@@ -42,10 +42,6 @@ func connect(conn storage.SSHConnection) {
 		return
 	}
 
-	fmt.Println("host is: " + conn.Host)
-	fmt.Println("username is: " + conn.Username)
-	fmt.Println("password is: " + conn.Password)
-
 	sshTarget := fmt.Sprintf("%s@%s", conn.Username, conn.Host)
 	args := []string{"sshpass", "-p", conn.Password, "ssh", sshTarget}
 
