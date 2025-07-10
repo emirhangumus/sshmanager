@@ -2,6 +2,9 @@
 
 A secure and simple command-line tool for managing and connecting to SSH servers. SSH Manager stores your SSH connection details using strong encryption and lets you connect to servers with a few keystrokes.
 
+## Demo
+![Demo](demo.gif)
+
 ## Features
 
 - 🔐 **Encrypted Storage**: Uses NaCl `secretbox` for secure encryption of connection details.
