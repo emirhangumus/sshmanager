@@ -7,7 +7,7 @@ import (
 	"github.com/manifoldco/promptui"
 )
 
-const version = "v0.2.5"
+const version = "v1.0.0"
 
 var options = []string{
 	"Exit",
