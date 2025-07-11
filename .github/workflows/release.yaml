@@ -1,0 +1,55 @@
+name: Build and Release
+
+on:
+  push:
+    tags:
+      - 'v*'  # Triggers on version tags like v1.0.0
+
+jobs:
+  release:
+    name: Build and create .deb package
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v3
+
+      - name: Set up Go
+        uses: actions/setup-go@v4
+        with:
+          go-version: '1.21'  # Or your preferred Go version
+
+      - name: Build binary
+        run: make build
+
+      - name: Create .deb package
+        run: |
+          VERSION="${GITHUB_REF##*/}"  # Extract tag like v1.0.0
+          VERSION=${VERSION#v}         # Strip 'v' prefix to get 1.0.0
+
+          mkdir -p sshmanager_${VERSION}/usr/bin
+          cp bin/sshmanager sshmanager_${VERSION}/usr/bin/
+          chmod +x sshmanager_${VERSION}/usr/bin/sshmanager
+
+          mkdir -p sshmanager_${VERSION}/DEBIAN
+          cat <<EOF > sshmanager_${VERSION}/DEBIAN/control
+          Package: sshmanager
+          Version: ${VERSION}
+          Section: utils
+          Priority: optional
+          Architecture: amd64
+          Maintainer: Your Name <you@example.com>
+          Description: Manage SSH connections from the terminal.
+          EOF
+
+          dpkg-deb --build sshmanager_${VERSION}
+          mv sshmanager_${VERSION}.deb sshmanager_${VERSION}_amd64.deb
+
+      - name: Upload release assets
+        uses: softprops/action-gh-release@v2
+        with:
+          files: |
+            bin/sshmanager
+            sshmanager_*.deb
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
