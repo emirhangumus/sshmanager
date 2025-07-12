@@ -60,7 +60,6 @@ func SecureDelete(path string) {
 		_, _ = rand.Read(randomData)
 		f.Write(randomData) // Overwrite with random data
 	}
-	f.Close()
 	os.Remove(path)
 }
 
