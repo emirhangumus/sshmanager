@@ -19,7 +19,10 @@ func HandleAdd(connectionFilePath string, secretKeyFilePath string) error {
 		return err
 	}
 
-	content, _ := storage.DecryptAndReadFile(connectionFilePath, key)
+	content, err := storage.DecryptAndReadFile(connectionFilePath, key)
+	if err != nil {
+		return err
+	}
 	if content != "" {
 		content += "\n" + connStr
 	} else {
