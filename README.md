@@ -65,11 +65,32 @@ You'll see a menu with the following options:
 
 ### Flags
 
-* `--clean` – Remove all saved SSH connections:
+* `-clean` – Remove all saved SSH connections:
 
   ```bash
-  sshmanager --clean
+  sshmanager -clean
   ```
+
+* `-version` – Show the current version of SSH Manager:
+
+  ```bash
+  sshmanager -version
+  ```
+
+* `-help` – Show help information:
+
+  ```bash
+  sshmanager -help
+  ```
+  
+* `-set` – Set a SSHManager config.
+
+  ```bash
+  sshmanager -set <key> <value>
+  ```
+| Key                              | Default Value   | Value Type   | Description                                                                                                                        |
+|----------------------------------|-----------------|--------------|------------------------------------------------------------------------------------------------------------------------------------|
+| `behaviour.continueAfterSSHExit` | `false`         | boolean      | If set to `true`, SSH Manager will return to the main menu after exiting an SSH session. If `false`, it will exit the application. |
 
 ## File Structure
 

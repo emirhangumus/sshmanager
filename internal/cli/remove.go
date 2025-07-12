@@ -5,22 +5,22 @@ import (
 	"strings"
 
 	"github.com/emirhangumus/sshmanager/internal/encryption"
-	"github.com/emirhangumus/sshmanager/internal/prompts"
+	"github.com/emirhangumus/sshmanager/internal/prompt"
 	"github.com/emirhangumus/sshmanager/internal/storage"
 	"github.com/manifoldco/promptui"
 )
 
-func HandleRemove(dataPath, keyPath string) {
-	connections, err := storage.ReadAllConnections(dataPath, keyPath)
+func HandleRemove(connectionFilePath string, secretKeyFilePath string) {
+	connections, err := storage.ReadAllConnections(connectionFilePath, secretKeyFilePath)
 	if err != nil || len(connections) == 0 {
-		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
+		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 		return
 	}
 
 	items := ConnToStrSlice(connections)
-	prompt := promptui.Select{Label: prompts.DefaultPromptTexts.SelectAConnectionToRemove, Items: items}
-	_, result, err := prompt.Run()
-	if err != nil || result == prompts.DefaultPromptTexts.BackToMainMenu {
+	_prompt := promptui.Select{Label: prompt.DefaultPromptTexts.SelectAConnectionToRemove, Items: items}
+	_, result, err := _prompt.Run()
+	if err != nil || result == prompt.DefaultPromptTexts.BackToMainMenu {
 		return
 	}
 
@@ -41,16 +41,16 @@ func HandleRemove(dataPath, keyPath string) {
 		lines = append(lines, line)
 	}
 
-	keyBytes, err := encryption.LoadKey(keyPath)
+	keyBytes, err := encryption.LoadKey(secretKeyFilePath)
 	if err != nil {
-		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.ErrorLoadingEncryptionKeyX, err)
+		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.ErrorLoadingEncryptionKeyX, err)
 		return
 	}
 
-	if err := storage.StoreFile(strings.Join(lines, "\n"), dataPath, keyBytes); err != nil {
-		fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.FailedToStoreUpdatedConnectionsX, err)
+	if err := storage.EncryptAndStoreFile(strings.Join(lines, "\n"), connectionFilePath, keyBytes); err != nil {
+		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToStoreUpdatedConnectionsX, err)
 		return
 	}
 
-	fmt.Println(prompts.DefaultPromptTexts.SuccessMessages.SSHConnectionRemoved)
+	fmt.Println(prompt.DefaultPromptTexts.SuccessMessages.SSHConnectionRemoved)
 }

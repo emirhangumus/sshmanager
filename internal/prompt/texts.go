@@ -1,4 +1,4 @@
-package prompts
+package prompt
 
 type DefaultPromptTextError struct {
 	NoSSHConnectionsFound            string
@@ -10,6 +10,7 @@ type DefaultPromptTextError struct {
 	FailedToStoreUpdatedConnectionsX string
 	DecryptionDataFailedX            string
 	InvalidDataFormatX               string
+	FailedToLoadConfigX              string
 }
 
 type DefaultPromptTextSuccess struct {
@@ -57,6 +58,7 @@ var DefaultPromptTexts = DefaultPromptText{
 		FailedToStoreUpdatedConnectionsX: "Failed to store updated connections: %s",
 		DecryptionDataFailedX:            "Decryption data failed: %v",
 		InvalidDataFormatX:               "Invalid data format: %s",
+		FailedToLoadConfigX:              "Failed to load config: %s",
 	},
 	SuccessMessages: DefaultPromptTextSuccess{
 		SSHConnectionSaved:   "SSH connection saved.",
