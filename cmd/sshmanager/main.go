@@ -1,14 +1,13 @@
 package main
 
 import (
-	"flag"
-	"fmt"
+	"github.com/emirhangumus/sshmanager/internal/cli/flag"
+	"github.com/emirhangumus/sshmanager/internal/startup"
 	"log"
 	"os"
 	"path/filepath"
 
 	"github.com/emirhangumus/sshmanager/internal/cli"
-	"github.com/emirhangumus/sshmanager/internal/encryption"
 )
 
 func main() {
@@ -17,18 +16,21 @@ func main() {
 		log.Fatalf("Could not determine home directory: %v", err)
 	}
 
-	defaultFile := filepath.Join(homeDir, ".sshmanager", "conn")
-	keyFile := filepath.Join(homeDir, ".sshmanager", "secret.key")
+	connectionFilePath := filepath.Join(homeDir, ".sshmanager", "conn")
+	secretKeyFilePath := filepath.Join(homeDir, ".sshmanager", "secret.key")
+	configFilePath := filepath.Join(homeDir, ".sshmanager", "config.yaml")
 
-	clean := flag.Bool("clean", false, "Reset all saved SSH connections and key file")
-	flag.Parse()
+	if err := startup.Startup(configFilePath); err != nil {
+		log.Fatalf("Error during startup: %v", err)
+	}
 
-	if *clean {
-		encryption.SecureDelete(defaultFile)
-		encryption.SecureDelete(keyFile)
-		fmt.Println("All SSH connections and key files removed.")
+	continueExecution, err := flag.Check(connectionFilePath, secretKeyFilePath, configFilePath)
+	if err != nil {
+		log.Fatalf("Error checking flags: %v", err)
+	}
+	if !continueExecution {
 		return
 	}
 
-	cli.ShowMainMenu(defaultFile, keyFile)
+	cli.ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath)
 }

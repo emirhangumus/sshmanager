@@ -2,12 +2,11 @@ package cli
 
 import (
 	"fmt"
+	"github.com/emirhangumus/sshmanager/internal/cli/flag"
 
-	"github.com/emirhangumus/sshmanager/internal/prompts"
+	"github.com/emirhangumus/sshmanager/internal/prompt"
 	"github.com/manifoldco/promptui"
 )
-
-const version = "v1.0.0"
 
 var options = []string{
 	"Exit",
@@ -16,30 +15,37 @@ var options = []string{
 	"Remove SSH Connection",
 }
 
-func ShowMainMenu(dataPath, keyPath string) {
+func ShowMainMenu(connectionFilePath string, secretKeyFilePath string, configFilePath string) {
+
+	config, err := flag.LoadConfig(configFilePath)
+	if err != nil {
+		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToLoadConfigX, err)
+		return
+	}
+
 	for {
-		prompt := promptui.Select{
-			Label: "Menu Options | " + version,
+		_prompt := promptui.Select{
+			Label: "Menu Options | " + flag.SSHManagerVersion,
 			Items: options,
 		}
 
-		_, choice, err := prompt.Run()
+		_, choice, err := _prompt.Run()
 		if err != nil {
-			fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.InvalidSelectionX, err)
+			fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.InvalidSelectionX, err)
 			continue
 		}
 
 		switch choice {
-		case prompts.DefaultPromptTexts.Exit:
+		case prompt.DefaultPromptTexts.Exit:
 			return
-		case prompts.DefaultPromptTexts.ConnectToSSH:
-			HandleConnect(dataPath, keyPath)
-		case prompts.DefaultPromptTexts.AddSSHConnection:
-			if err := HandleAdd(dataPath, keyPath); err != nil {
-				fmt.Println(prompts.DefaultPromptTexts.ErrorMessages.FailedToAddConnectionX, err)
+		case prompt.DefaultPromptTexts.ConnectToSSH:
+			HandleConnect(connectionFilePath, secretKeyFilePath, &config)
+		case prompt.DefaultPromptTexts.AddSSHConnection:
+			if err := HandleAdd(connectionFilePath, secretKeyFilePath); err != nil {
+				fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToAddConnectionX, err)
 			}
-		case prompts.DefaultPromptTexts.RemoveSSHConnection:
-			HandleRemove(dataPath, keyPath)
+		case prompt.DefaultPromptTexts.RemoveSSHConnection:
+			HandleRemove(connectionFilePath, secretKeyFilePath)
 		}
 	}
 }

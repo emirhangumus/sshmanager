@@ -1,4 +1,4 @@
-package prompts
+package prompt
 
 import (
 	"errors"

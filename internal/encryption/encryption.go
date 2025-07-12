@@ -8,7 +8,7 @@ import (
 	"os"
 	"path/filepath"
 
-	"github.com/emirhangumus/sshmanager/internal/prompts"
+	"github.com/emirhangumus/sshmanager/internal/prompt"
 )
 
 // Generate a 32-byte AES key
@@ -64,7 +64,7 @@ func EncryptData(data string, key []byte) ([]byte, error) {
 // DecryptData Decrypt data using AES-GCM
 func DecryptData(encryptedData, key []byte) (string, error) {
 	if len(encryptedData) < 12 {
-		return "", fmt.Errorf(prompts.DefaultPromptTexts.ErrorMessages.InvalidDataFormatX, "encrypted data too short")
+		return "", fmt.Errorf(prompt.DefaultPromptTexts.ErrorMessages.InvalidDataFormatX, "encrypted data too short")
 	}
 	nonce, ciphertext := encryptedData[:12], encryptedData[12:]
 	block, err := aes.NewCipher(key)
@@ -77,26 +77,7 @@ func DecryptData(encryptedData, key []byte) (string, error) {
 	}
 	plaintext, err := aesgcm.Open(nil, nonce, ciphertext, nil)
 	if err != nil {
-		return "", fmt.Errorf(prompts.DefaultPromptTexts.ErrorMessages.DecryptionDataFailedX, err)
+		return "", fmt.Errorf(prompt.DefaultPromptTexts.ErrorMessages.DecryptionDataFailedX, err)
 	}
 	return string(plaintext), nil
-}
-
-// SecureDelete Securely delete a file by overwriting with random data before removal
-func SecureDelete(path string) {
-	f, err := os.OpenFile(path, os.O_WRONLY, 0600)
-	if err != nil {
-		return
-	}
-	defer f.Close()
-
-	info, err := os.Stat(path)
-	if err == nil {
-		size := info.Size()
-		randomData := make([]byte, size)
-		_, _ = rand.Read(randomData)
-		f.Write(randomData) // Overwrite with random data
-	}
-	f.Close()
-	os.Remove(path)
 }

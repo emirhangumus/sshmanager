@@ -16,13 +16,13 @@ type SSHConnection struct {
 }
 
 // ReadAllConnections reads and parses all stored SSH connections.
-func ReadAllConnections(dataPath, keyPath string) ([]SSHConnection, error) {
-	key, err := encryption.LoadKey(keyPath)
+func ReadAllConnections(connectionFilePath string, secretKeyFilePath string) ([]SSHConnection, error) {
+	key, err := encryption.LoadKey(secretKeyFilePath)
 	if err != nil {
 		return nil, err
 	}
 
-	content, err := ReadFile(dataPath, key)
+	content, err := DecryptAndReadFile(connectionFilePath, key)
 	if err != nil {
 		return nil, err
 	}
