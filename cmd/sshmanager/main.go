@@ -1,11 +1,12 @@
 package main
 
 import (
-	"github.com/emirhangumus/sshmanager/internal/cli/flag"
-	"github.com/emirhangumus/sshmanager/internal/startup"
 	"log"
 	"os"
 	"path/filepath"
+
+	"github.com/emirhangumus/sshmanager/internal/cli/flag"
+	"github.com/emirhangumus/sshmanager/internal/startup"
 
 	"github.com/emirhangumus/sshmanager/internal/cli"
 )
@@ -20,7 +21,7 @@ func main() {
 	secretKeyFilePath := filepath.Join(homeDir, ".sshmanager", "secret.key")
 	configFilePath := filepath.Join(homeDir, ".sshmanager", "config.yaml")
 
-	if err := startup.Startup(configFilePath); err != nil {
+	if err := startup.Startup(connectionFilePath, configFilePath, secretKeyFilePath); err != nil {
 		log.Fatalf("Error during startup: %v", err)
 	}
 
