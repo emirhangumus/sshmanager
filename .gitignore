@@ -27,3 +27,5 @@ vendor/
 
 # Config or encrypted data (only if auto-generated)
 .sshmanager/
+# Added by goreleaser init:
+dist/
