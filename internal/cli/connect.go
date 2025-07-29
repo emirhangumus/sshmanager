@@ -2,25 +2,27 @@ package cli
 
 import (
 	"fmt"
-	"github.com/emirhangumus/sshmanager/internal/cli/flag"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
+	"github.com/emirhangumus/sshmanager/internal/cli/flag"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/g_connectionfile"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/g_sshconnection"
+
 	"github.com/emirhangumus/sshmanager/internal/prompt"
-	"github.com/emirhangumus/sshmanager/internal/storage"
 	"github.com/manifoldco/promptui"
 )
 
 func HandleConnect(connectionFilePath string, secretKeyFilePath string, config *flag.SSHManagerConfig) {
-	connections, err := storage.ReadAllConnections(connectionFilePath, secretKeyFilePath)
-	if err != nil {
+	connFile := g_connectionfile.NewConnectionFile(connectionFilePath, secretKeyFilePath)
+	if len(connFile.Connections) == 0 {
 		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 		return
 	}
 
-	items := ConnToStrSlice(connections)
+	items := connFile.SafeConnectionListString()
 	_prompt := promptui.Select{Label: prompt.DefaultPromptTexts.SelectAnSSHConnection, Items: items}
 	_, result, err := _prompt.Run()
 	if err != nil || result == prompt.DefaultPromptTexts.BackToMainMenu {
@@ -28,16 +30,16 @@ func HandleConnect(connectionFilePath string, secretKeyFilePath string, config *
 	}
 
 	index := strings.SplitN(result, ".", 2)[0]
-	conn, err := GetConnByIndex(index, connections)
-	if err != nil {
-		fmt.Println(err)
+	conn := connFile.GetConnection(index)
+	if conn == nil {
+		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 		return
 	}
 
 	connect(conn, config)
 }
 
-func connect(conn storage.SSHConnection, config *flag.SSHManagerConfig) {
+func connect(conn *g_sshconnection.SSHConnection, config *flag.SSHManagerConfig) {
 	sshpassPath, err := exec.LookPath("sshpass")
 	if err != nil {
 		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.SSHPassNotFound)
@@ -47,7 +49,7 @@ func connect(conn storage.SSHConnection, config *flag.SSHManagerConfig) {
 	sshTarget := fmt.Sprintf("%s@%s", conn.Username, conn.Host)
 	args := []string{"sshpass", "-p", conn.Password, "ssh", sshTarget}
 
-	if config.Behaviour.ContinueAfterSSHExit == true {
+	if config.Behaviour.ContinueAfterSSHExit {
 		// Background process
 		bgCmd := exec.Command(sshpassPath, args[1:]...) // skip sshpassPath since it's set via Path
 		bgCmd.SysProcAttr = &syscall.SysProcAttr{

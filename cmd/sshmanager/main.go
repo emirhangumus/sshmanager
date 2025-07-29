@@ -33,5 +33,12 @@ func main() {
 		return
 	}
 
+	// That means, user provided an alias to connect to a specific connection
+	if len(os.Args) == 2 {
+		arg := os.Args[1]
+		cli.FindAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, arg)
+		return
+	}
+
 	cli.ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath)
 }

@@ -3,9 +3,10 @@ package storage
 import (
 	"crypto/rand"
 	"fmt"
-	"gopkg.in/yaml.v3"
 	"os"
 	"path/filepath"
+
+	"gopkg.in/yaml.v3"
 
 	"github.com/emirhangumus/sshmanager/internal/encryption"
 )
@@ -115,4 +116,20 @@ func IsFileEmpty(filePath string) (bool, error) {
 		return false, fmt.Errorf("failed to stat file %s: %w", filePath, err)
 	}
 	return fileInfo.Size() == 0, nil
+}
+
+func ToYAMLString(data interface{}) (string, error) {
+	dataBytes, err := yaml.Marshal(data)
+	if err != nil {
+		return "", fmt.Errorf("failed to marshal data to YAML: %w", err)
+	}
+	return string(dataBytes), nil
+}
+
+func FromYAMLString(yamlStr string, out interface{}) error {
+	err := yaml.Unmarshal([]byte(yamlStr), out)
+	if err != nil {
+		return fmt.Errorf("failed to unmarshal YAML string: %w", err)
+	}
+	return nil
 }

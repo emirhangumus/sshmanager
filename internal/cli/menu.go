@@ -2,6 +2,7 @@ package cli
 
 import (
 	"fmt"
+
 	"github.com/emirhangumus/sshmanager/internal/cli/flag"
 
 	"github.com/emirhangumus/sshmanager/internal/prompt"
@@ -12,6 +13,7 @@ var options = []string{
 	"Exit",
 	"Connect to SSH",
 	"Add SSH Connection",
+	"Edit SSH Connection",
 	"Remove SSH Connection",
 }
 
@@ -44,8 +46,12 @@ func ShowMainMenu(connectionFilePath string, secretKeyFilePath string, configFil
 			if err := HandleAdd(connectionFilePath, secretKeyFilePath); err != nil {
 				fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToAddConnectionX, err)
 			}
+		case prompt.DefaultPromptTexts.EditSSHConnection:
+			HandleEdit(connectionFilePath, secretKeyFilePath)
 		case prompt.DefaultPromptTexts.RemoveSSHConnection:
-			HandleRemove(connectionFilePath, secretKeyFilePath)
+			if err := HandleRemove(connectionFilePath, secretKeyFilePath); err != nil {
+				fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToLoadConfigX, err) // change to appropriate error message
+			}
 		}
 	}
 }
