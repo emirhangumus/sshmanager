@@ -43,5 +43,7 @@ func Startup(connectionFilePath string, configFilePath string, secretKeyFilePath
 		}
 	}
 
+	ensureShellCompletion()
+	
 	return nil
 }
