@@ -112,6 +112,16 @@ func (c *ConnectionFile) SafeConnectionListString() []string {
 	return items
 }
 
+func (c *ConnectionFile) GeetAllAliases() []string {
+	var aliases []string
+	for _, conn := range c.Connections {
+		if conn.Alias != "" {
+			aliases = append(aliases, conn.Alias)
+		}
+	}
+	return aliases
+}
+
 func (c *ConnectionFile) GetConnectionByAlias(alias string) *sshconnection.SSHConnection {
 	for _, conn := range c.Connections {
 		if conn.Alias == alias {
