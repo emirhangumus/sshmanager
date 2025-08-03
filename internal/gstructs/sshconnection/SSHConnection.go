@@ -1,4 +1,4 @@
-package g_sshconnection
+package sshconnection
 
 type SSHConnection struct {
 	Index       string

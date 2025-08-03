@@ -2,21 +2,20 @@ package cli
 
 import (
 	"fmt"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/connectionfile"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/sshconnection"
 	"os"
 	"os/exec"
 	"strings"
 	"syscall"
 
 	"github.com/emirhangumus/sshmanager/internal/cli/flag"
-	"github.com/emirhangumus/sshmanager/internal/gstructs/g_connectionfile"
-	"github.com/emirhangumus/sshmanager/internal/gstructs/g_sshconnection"
-
 	"github.com/emirhangumus/sshmanager/internal/prompt"
 	"github.com/manifoldco/promptui"
 )
 
 func HandleConnect(connectionFilePath string, secretKeyFilePath string, config *flag.SSHManagerConfig) {
-	connFile := g_connectionfile.NewConnectionFile(connectionFilePath, secretKeyFilePath)
+	connFile := connectionfile.NewConnectionFile(connectionFilePath, secretKeyFilePath)
 	if len(connFile.Connections) == 0 {
 		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 		return
@@ -39,7 +38,7 @@ func HandleConnect(connectionFilePath string, secretKeyFilePath string, config *
 	connect(conn, config)
 }
 
-func connect(conn *g_sshconnection.SSHConnection, config *flag.SSHManagerConfig) {
+func connect(conn *sshconnection.SSHConnection, config *flag.SSHManagerConfig) {
 	sshpassPath, err := exec.LookPath("sshpass")
 	if err != nil {
 		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.SSHPassNotFound)

@@ -2,10 +2,9 @@ package cli
 
 import (
 	"fmt"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/connectionfile"
 
 	"github.com/emirhangumus/sshmanager/internal/cli/flag"
-	"github.com/emirhangumus/sshmanager/internal/gstructs/g_connectionfile"
-
 	"github.com/emirhangumus/sshmanager/internal/prompt"
 )
 
@@ -16,7 +15,7 @@ func FindAndConnect(connectionFilePath string, secretKeyFilePath string, configF
 		return
 	}
 
-	connFile := g_connectionfile.NewConnectionFile(connectionFilePath, secretKeyFilePath)
+	connFile := connectionfile.NewConnectionFile(connectionFilePath, secretKeyFilePath)
 	if len(connFile.Connections) == 0 {
 		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
 		return

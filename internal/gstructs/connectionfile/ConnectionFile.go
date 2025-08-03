@@ -1,22 +1,22 @@
-package g_connectionfile
+package connectionfile
 
 import (
 	"fmt"
 
 	"github.com/emirhangumus/sshmanager/internal/encryption"
-	"github.com/emirhangumus/sshmanager/internal/gstructs/g_sshconnection"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/sshconnection"
 	"github.com/emirhangumus/sshmanager/internal/storage"
 )
 
 type ConnectionFile struct {
-	Version     string                          `yaml:"version"`
-	Connections []g_sshconnection.SSHConnection `yaml:"connections"`
+	Version     string                        `yaml:"version"`
+	Connections []sshconnection.SSHConnection `yaml:"connections"`
 }
 
 func NewConnectionFile(connectionFilePath string, secretKeyFilePath string) *ConnectionFile {
 	c := &ConnectionFile{
 		Version:     "1.0",
-		Connections: []g_sshconnection.SSHConnection{},
+		Connections: []sshconnection.SSHConnection{},
 	}
 	c.Load(connectionFilePath, secretKeyFilePath)
 	return c
@@ -49,7 +49,7 @@ func (c ConnectionFile) String() string {
 	return result
 }
 
-func (c *ConnectionFile) AddConnection(conn g_sshconnection.SSHConnection) {
+func (c *ConnectionFile) AddConnection(conn sshconnection.SSHConnection) {
 	conn.Index = fmt.Sprintf("%d", len(c.Connections)+1) // Set index based on current length
 	c.Connections = append(c.Connections, conn)
 }
@@ -63,7 +63,7 @@ func (c *ConnectionFile) RemoveConnection(index string) {
 	}
 }
 
-func (c *ConnectionFile) GetConnection(index string) *g_sshconnection.SSHConnection {
+func (c *ConnectionFile) GetConnection(index string) *sshconnection.SSHConnection {
 	for _, conn := range c.Connections {
 		if conn.Index == index {
 			return &conn
@@ -72,7 +72,7 @@ func (c *ConnectionFile) GetConnection(index string) *g_sshconnection.SSHConnect
 	return nil
 }
 
-func (c *ConnectionFile) UpdateConnection(index string, updatedConn g_sshconnection.SSHConnection) {
+func (c *ConnectionFile) UpdateConnection(index string, updatedConn sshconnection.SSHConnection) {
 	for i, conn := range c.Connections {
 		if conn.Index == index {
 			updatedConn.Index = index // Keep the same index
@@ -112,7 +112,7 @@ func (c *ConnectionFile) SafeConnectionListString() []string {
 	return items
 }
 
-func (c *ConnectionFile) GetConnectionByAlias(alias string) *g_sshconnection.SSHConnection {
+func (c *ConnectionFile) GetConnectionByAlias(alias string) *sshconnection.SSHConnection {
 	for _, conn := range c.Connections {
 		if conn.Alias == alias {
 			return &conn

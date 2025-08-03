@@ -2,8 +2,8 @@ package prompt
 
 import (
 	"errors"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/sshconnection"
 
-	"github.com/emirhangumus/sshmanager/internal/gstructs/g_sshconnection"
 	"github.com/manifoldco/promptui"
 )
 
@@ -14,14 +14,14 @@ func validateText(input string) error {
 	return nil
 }
 
-func AddSSHConnectionPrompt() (g_sshconnection.SSHConnection, error) {
+func AddSSHConnectionPrompt() (sshconnection.SSHConnection, error) {
 	prompt := promptui.Prompt{
 		Label:    "Enter Host",
 		Validate: validateText,
 	}
 	host, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -30,7 +30,7 @@ func AddSSHConnectionPrompt() (g_sshconnection.SSHConnection, error) {
 	}
 	username, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -40,7 +40,7 @@ func AddSSHConnectionPrompt() (g_sshconnection.SSHConnection, error) {
 	}
 	password, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -48,7 +48,7 @@ func AddSSHConnectionPrompt() (g_sshconnection.SSHConnection, error) {
 	}
 	description, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -56,10 +56,10 @@ func AddSSHConnectionPrompt() (g_sshconnection.SSHConnection, error) {
 	}
 	alias, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
-	return g_sshconnection.SSHConnection{
+	return sshconnection.SSHConnection{
 		Index:       "", // Index will be set later
 		Username:    username,
 		Host:        host,
@@ -69,7 +69,7 @@ func AddSSHConnectionPrompt() (g_sshconnection.SSHConnection, error) {
 	}, nil
 }
 
-func EditSSHConnectionPrompt(conn *g_sshconnection.SSHConnection) (g_sshconnection.SSHConnection, error) {
+func EditSSHConnectionPrompt(conn *sshconnection.SSHConnection) (sshconnection.SSHConnection, error) {
 	prompt := promptui.Prompt{
 		Label:    "Edit Host",
 		Default:  conn.Host,
@@ -77,7 +77,7 @@ func EditSSHConnectionPrompt(conn *g_sshconnection.SSHConnection) (g_sshconnecti
 	}
 	host, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -87,7 +87,7 @@ func EditSSHConnectionPrompt(conn *g_sshconnection.SSHConnection) (g_sshconnecti
 	}
 	username, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -97,7 +97,7 @@ func EditSSHConnectionPrompt(conn *g_sshconnection.SSHConnection) (g_sshconnecti
 	}
 	password, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -106,7 +106,7 @@ func EditSSHConnectionPrompt(conn *g_sshconnection.SSHConnection) (g_sshconnecti
 	}
 	description, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -115,10 +115,10 @@ func EditSSHConnectionPrompt(conn *g_sshconnection.SSHConnection) (g_sshconnecti
 	}
 	alias, err := prompt.Run()
 	if err != nil {
-		return g_sshconnection.SSHConnection{}, err
+		return sshconnection.SSHConnection{}, err
 	}
 
-	return g_sshconnection.SSHConnection{
+	return sshconnection.SSHConnection{
 		Index:       conn.Index, // Keep the same index
 		Username:    username,
 		Host:        host,
