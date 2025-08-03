@@ -7,10 +7,15 @@ A secure and simple command-line tool for managing and connecting to SSH servers
 
 ## Features
 
-- 🔐 **Encrypted Storage**: Uses NaCl `secretbox` for secure encryption of connection details.
-- ➕ **Add SSH Connections**: Input and securely save SSH server details.
+- 🔐 **Encrypted Storage**: Uses AES-GCM encryption for secure storage of connection details.
+- ➕ **Add SSH Connections**: Input and securely save SSH server details with descriptions and aliases.
+- ✏️ **Edit SSH Connections**: Modify existing connection details.
+- 🗑️ **Remove SSH Connections**: Safely delete specific connections.
 - ⚡ **Quick Connect**: Automatically connect to saved SSH servers using `sshpass`.
-- 🧹 **Cleanup Option**: Clear all saved (encrypted) SSH connections with a single flag.
+- 🏷️ **Alias Support**: Connect directly using connection aliases (e.g., `sshmanager myserver`).
+- 🔧 **Configurable Behavior**: Customize SSH Manager behavior with configuration options.
+- 🧹 **Secure Cleanup**: Securely wipe all saved connections and encryption keys.
+- 🎯 **Tab Completion**: Shell completion support for Bash and Zsh.
 
 ## Requirements
 
@@ -62,6 +67,8 @@ You'll see a menu with the following options:
 
 * **Add SSH Connection**: Enter host, username, and password (encrypted and saved).
 * **Connect to SSH**: Choose a saved connection to connect instantly.
+* **Edit SSH Connection**: Modify existing connection details.
+* **Remove SSH Connection**: Delete specific connections safely.
 
 ### Flags
 
@@ -83,11 +90,37 @@ You'll see a menu with the following options:
   sshmanager -help
   ```
   
-* `-set` – Set a SSHManager config.
+* `-set` – Set a SSHManager config:
 
   ```bash
   sshmanager -set <key> <value>
   ```
+
+* `-complete` – Show complete list of hosts for tab completion:
+
+  ```bash
+  sshmanager -complete [prefix]
+  ```
+
+* `-completion` – Generate shell completion scripts:
+
+  ```bash
+  sshmanager -completion bash
+  sshmanager -completion zsh
+  ```
+
+### Direct Connection with Aliases
+
+You can connect directly to a saved connection using its alias:
+
+```bash
+sshmanager myserver
+```
+
+This will immediately connect to the SSH server associated with the `myserver` alias without showing the menu.
+
+### Configuration Options
+
 | Key                              | Default Value   | Value Type   | Description                                                                                                                        |
 |----------------------------------|-----------------|--------------|------------------------------------------------------------------------------------------------------------------------------------|
 | `behaviour.continueAfterSSHExit` | `false`         | boolean      | If set to `true`, SSH Manager will return to the main menu after exiting an SSH session. If `false`, it will exit the application. |
@@ -105,16 +138,16 @@ Encrypted connection data is saved to:
 | Command                   | Description                 |
 | ------------------------- | --------------------------- |
 | `make build`              | Build the binary            |
-| `make build_compressed`   | Build and compress with UPX |
+| `make build-compressed`   | Build and compress with UPX |
 | `make install`            | Install the binary locally  |
-| `make install_compressed` | Install compressed binary   |
+| `make install-compressed` | Install compressed binary   |
 | `make run`                | Builds and runs the binary  |
 | `make clean`              | Remove build artifacts      |
 | `make remove`             | Remove the installed binary |
 
 ## Security Notes
 
-All SSH connection details are encrypted using `secretbox` (XSalsa20 + Poly1305). Your credentials never leave your machine and are stored in encrypted form only.
+All SSH connection details are encrypted using AES-GCM encryption. Your credentials never leave your machine and are stored in encrypted form only.
 
 ## License
 
