@@ -2,7 +2,7 @@ package prompt
 
 import (
 	"errors"
-	"fmt"
+	"github.com/emirhangumus/sshmanager/internal/gstructs/sshconnection"
 
 	"github.com/manifoldco/promptui"
 )
@@ -14,14 +14,14 @@ func validateText(input string) error {
 	return nil
 }
 
-func AddSSHConnectionPrompt() (string, error) {
+func AddSSHConnectionPrompt() (sshconnection.SSHConnection, error) {
 	prompt := promptui.Prompt{
 		Label:    "Enter Host",
 		Validate: validateText,
 	}
 	host, err := prompt.Run()
 	if err != nil {
-		return "", err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -30,7 +30,7 @@ func AddSSHConnectionPrompt() (string, error) {
 	}
 	username, err := prompt.Run()
 	if err != nil {
-		return "", err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -40,7 +40,7 @@ func AddSSHConnectionPrompt() (string, error) {
 	}
 	password, err := prompt.Run()
 	if err != nil {
-		return "", err
+		return sshconnection.SSHConnection{}, err
 	}
 
 	prompt = promptui.Prompt{
@@ -48,8 +48,82 @@ func AddSSHConnectionPrompt() (string, error) {
 	}
 	description, err := prompt.Run()
 	if err != nil {
-		return "", err
+		return sshconnection.SSHConnection{}, err
 	}
 
-	return fmt.Sprintf("%s@%s\t%s\t%s", username, host, password, description), nil
+	prompt = promptui.Prompt{
+		Label: "Enter Alias",
+	}
+	alias, err := prompt.Run()
+	if err != nil {
+		return sshconnection.SSHConnection{}, err
+	}
+
+	return sshconnection.SSHConnection{
+		Index:       "", // Index will be set later
+		Username:    username,
+		Host:        host,
+		Password:    password,
+		Description: description,
+		Alias:       alias,
+	}, nil
+}
+
+func EditSSHConnectionPrompt(conn *sshconnection.SSHConnection) (sshconnection.SSHConnection, error) {
+	prompt := promptui.Prompt{
+		Label:    "Edit Host",
+		Default:  conn.Host,
+		Validate: validateText,
+	}
+	host, err := prompt.Run()
+	if err != nil {
+		return sshconnection.SSHConnection{}, err
+	}
+
+	prompt = promptui.Prompt{
+		Label:    "Edit Username",
+		Default:  conn.Username,
+		Validate: validateText,
+	}
+	username, err := prompt.Run()
+	if err != nil {
+		return sshconnection.SSHConnection{}, err
+	}
+
+	prompt = promptui.Prompt{
+		Label:   "Edit Password",
+		Default: conn.Password,
+		Mask:    '*',
+	}
+	password, err := prompt.Run()
+	if err != nil {
+		return sshconnection.SSHConnection{}, err
+	}
+
+	prompt = promptui.Prompt{
+		Label:   "Edit Description",
+		Default: conn.Description,
+	}
+	description, err := prompt.Run()
+	if err != nil {
+		return sshconnection.SSHConnection{}, err
+	}
+
+	prompt = promptui.Prompt{
+		Label:   "Edit Alias",
+		Default: conn.Alias,
+	}
+	alias, err := prompt.Run()
+	if err != nil {
+		return sshconnection.SSHConnection{}, err
+	}
+
+	return sshconnection.SSHConnection{
+		Index:       conn.Index, // Keep the same index
+		Username:    username,
+		Host:        host,
+		Password:    password,
+		Description: description,
+		Alias:       alias,
+	}, nil
 }

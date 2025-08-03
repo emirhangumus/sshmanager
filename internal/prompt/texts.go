@@ -28,6 +28,7 @@ type DefaultPromptText struct {
 	Exit                      string
 	ConnectToSSH              string
 	AddSSHConnection          string
+	EditSSHConnection         string
 	RemoveSSHConnection       string
 	SelectAConnectionToRemove string
 	SSHConnectionRemoved      string
@@ -45,6 +46,7 @@ var DefaultPromptTexts = DefaultPromptText{
 	Exit:                      "Exit",
 	ConnectToSSH:              "Connect to SSH",
 	AddSSHConnection:          "Add SSH Connection",
+	EditSSHConnection:         "Edit SSH Connection",
 	RemoveSSHConnection:       "Remove SSH Connection",
 	SelectAConnectionToRemove: "Select a connection to remove",
 	SSHConnectionRemoved:      "SSH connection removed.",
