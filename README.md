@@ -1,55 +1,42 @@
 # SSH Manager
 
-A secure and simple command-line tool for managing and connecting to SSH servers. SSH Manager stores your SSH connection details using strong encryption and lets you connect to servers with a few keystrokes.
+SSH Manager is a terminal application for storing and connecting to SSH hosts from an interactive menu or alias command.
 
 ## Demo
+
 ![Demo](demo.gif)
 
 ## Features
 
-- 🔐 **Encrypted Storage**: Uses AES-GCM encryption for secure storage of connection details.
-- ➕ **Add SSH Connections**: Input and securely save SSH server details with descriptions and aliases.
-- ✏️ **Edit SSH Connections**: Modify existing connection details.
-- 🗑️ **Remove SSH Connections**: Safely delete specific connections.
-- ⚡ **Quick Connect**: Automatically connect to saved SSH servers using `sshpass`.
-- 🏷️ **Alias Support**: Connect directly using connection aliases (e.g., `sshmanager myserver`).
-- 🔧 **Configurable Behavior**: Customize SSH Manager behavior with configuration options.
-- 🧹 **Secure Cleanup**: Securely wipe all saved connections and encryption keys.
-- 🎯 **Tab Completion**: Shell completion support for Bash and Zsh.
+- AES-GCM encrypted storage for saved connections
+- Add, edit, remove, and connect from an interactive menu
+- Direct alias connection (`sshmanager myserver`)
+- Configurable post-SSH behavior (`behaviour.continueAfterSSHExit`)
+- Shell completion support for Bash and Zsh
+- Best-effort secure cleanup (`-clean`) for connection and key files
 
 ## Requirements
 
-- **Go 1.19+**
-- **sshpass**
-- **OpenSSH client**
+- Go `1.23.2+`
+- `sshpass`
+- OpenSSH client (`ssh`)
 
-Install requirements on Debian/Ubuntu:
+Example (Debian/Ubuntu):
+
 ```bash
 sudo apt install openssh-client sshpass
 ```
 
 ## Installation
 
-### 1. Clone the Repository
-
 ```bash
 git clone https://github.com/emirhangumus/sshmanager.git
 cd sshmanager
-```
-
-### 2. Build the Binary
-
-```bash
 make build
-```
-
-### 3. (Optional) Install to `~/.local/bin`
-
-```bash
 make install
 ```
 
-### 4. Run the App
+Run:
 
 ```bash
 sshmanager
@@ -57,97 +44,101 @@ sshmanager
 
 ## Usage
 
-### Run the App
+### Interactive menu
 
 ```bash
 sshmanager
 ```
 
-You'll see a menu with the following options:
-
-* **Add SSH Connection**: Enter host, username, and password (encrypted and saved).
-* **Connect to SSH**: Choose a saved connection to connect instantly.
-* **Edit SSH Connection**: Modify existing connection details.
-* **Remove SSH Connection**: Delete specific connections safely.
-
-### Flags
-
-* `-clean` – Remove all saved SSH connections:
-
-  ```bash
-  sshmanager -clean
-  ```
-
-* `-version` – Show the current version of SSH Manager:
-
-  ```bash
-  sshmanager -version
-  ```
-
-* `-help` – Show help information:
-
-  ```bash
-  sshmanager -help
-  ```
-  
-* `-set` – Set a SSHManager config:
-
-  ```bash
-  sshmanager -set <key> <value>
-  ```
-
-* `-complete` – Show complete list of hosts for tab completion:
-
-  ```bash
-  sshmanager -complete [prefix]
-  ```
-
-* `-completion` – Generate shell completion scripts:
-
-  ```bash
-  sshmanager -completion bash
-  sshmanager -completion zsh
-  ```
-
-### Direct Connection with Aliases
-
-You can connect directly to a saved connection using its alias:
+### Direct alias connection
 
 ```bash
 sshmanager myserver
 ```
 
-This will immediately connect to the SSH server associated with the `myserver` alias without showing the menu.
+### Flags
 
-### Configuration Options
+- Clean data:
 
-| Key                              | Default Value   | Value Type   | Description                                                                                                                        |
-|----------------------------------|-----------------|--------------|------------------------------------------------------------------------------------------------------------------------------------|
-| `behaviour.continueAfterSSHExit` | `false`         | boolean      | If set to `true`, SSH Manager will return to the main menu after exiting an SSH session. If `false`, it will exit the application. |
-
-## File Structure
-
-Encrypted connection data is saved to:
-
-```
-~/.sshmanager/conn
+```bash
+sshmanager -clean
 ```
 
-## Makefile Commands
+- Show version:
 
-| Command                   | Description                 |
-| ------------------------- | --------------------------- |
-| `make build`              | Build the binary            |
-| `make build-compressed`   | Build and compress with UPX |
-| `make install`            | Install the binary locally  |
-| `make install-compressed` | Install compressed binary   |
-| `make run`                | Builds and runs the binary  |
-| `make clean`              | Remove build artifacts      |
-| `make remove`             | Remove the installed binary |
+```bash
+sshmanager -version
+```
 
-## Security Notes
+- Set config value:
 
-All SSH connection details are encrypted using AES-GCM encryption. Your credentials never leave your machine and are stored in encrypted form only.
+```bash
+sshmanager -set behaviour.continueAfterSSHExit false
+sshmanager -set behaviour.showCredentialsOnConnect false
+```
+
+- Completion candidates (used by shell completion scripts):
+
+```bash
+sshmanager -complete [prefix]
+```
+
+- Print completion script:
+
+```bash
+sshmanager -completion bash
+sshmanager -completion zsh
+```
+
+- Install completion script (explicit opt-in):
+
+```bash
+sshmanager -completion install bash
+sshmanager -completion install zsh
+```
+
+For Bash, reload your shell after installation:
+
+```bash
+source ~/.bashrc
+```
+
+## Configuration
+
+| Key | Default | Type | Description |
+|---|---|---|---|
+| `behaviour.continueAfterSSHExit` | `false` | boolean | If `true`, return to menu after SSH exits. If `false`, exit the app after SSH session ends. |
+| `behaviour.showCredentialsOnConnect` | `false` | boolean | If `true`, prints username and password before opening SSH connection. |
+
+## Data files
+
+SSH Manager stores files under:
+
+```text
+~/.sshmanager/
+```
+
+Files:
+
+- `conn` (encrypted connection file)
+- `secret.key` (AES-256 key, file mode `0600`)
+- `config.yaml` (configuration)
+
+## Development
+
+```bash
+make test
+make vet
+make lint
+```
+
+## Security notes
+
+- Connection data is encrypted at rest using AES-GCM.
+- Key files are validated and stored with restrictive permissions.
+- SSH passwords are passed to `sshpass` via environment variable (`SSHPASS`) instead of CLI args.
+- Secure deletion is best-effort and may not provide full guarantees on all filesystems.
+- SSH keys/agent are preferred over password authentication when possible.
 
 ## License
 

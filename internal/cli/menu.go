@@ -3,54 +3,57 @@ package cli
 import (
 	"fmt"
 
-	"github.com/emirhangumus/sshmanager/internal/cli/flag"
-
-	"github.com/emirhangumus/sshmanager/internal/prompt"
+	"github.com/emirhangumus/sshmanager/internal/cli/commands"
+	"github.com/emirhangumus/sshmanager/internal/config"
+	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
 	"github.com/manifoldco/promptui"
 )
 
-var options = []string{
-	"Exit",
-	"Connect to SSH",
-	"Add SSH Connection",
-	"Edit SSH Connection",
-	"Remove SSH Connection",
-}
-
-func ShowMainMenu(connectionFilePath string, secretKeyFilePath string, configFilePath string) {
-
-	config, err := flag.LoadConfig(configFilePath)
+func ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath, version string) error {
+	cfg, err := config.LoadConfig(configFilePath)
 	if err != nil {
-		fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToLoadConfigX, err)
-		return
+		return fmt.Errorf(prompttext.DefaultPromptTexts.ErrorMessages.FailedToLoadConfigX, err)
+	}
+
+	options := []string{
+		prompttext.DefaultPromptTexts.Exit,
+		prompttext.DefaultPromptTexts.ConnectToSSH,
+		prompttext.DefaultPromptTexts.AddSSHConnection,
+		prompttext.DefaultPromptTexts.EditSSHConnection,
+		prompttext.DefaultPromptTexts.RemoveSSHConnection,
 	}
 
 	for {
-		_prompt := promptui.Select{
-			Label: "Menu Options | " + flag.SSHManagerVersion,
-			Items: options,
-		}
-
-		_, choice, err := _prompt.Run()
+		selector := promptui.Select{Label: "Menu Options | " + version, Items: options}
+		_, choice, err := selector.Run()
 		if err != nil {
-			fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.InvalidSelectionX, err)
+			fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.InvalidSelectionX+"\n", err)
 			continue
 		}
 
 		switch choice {
-		case prompt.DefaultPromptTexts.Exit:
-			return
-		case prompt.DefaultPromptTexts.ConnectToSSH:
-			HandleConnect(connectionFilePath, secretKeyFilePath, &config)
-		case prompt.DefaultPromptTexts.AddSSHConnection:
-			if err := HandleAdd(connectionFilePath, secretKeyFilePath); err != nil {
-				fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToAddConnectionX, err)
+		case prompttext.DefaultPromptTexts.Exit:
+			return nil
+		case prompttext.DefaultPromptTexts.ConnectToSSH:
+			exitAfterSSH, err := commands.HandleConnect(connectionFilePath, secretKeyFilePath, &cfg)
+			if err != nil {
+				fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.FailedToLoadConnectionsX+"\n", err)
+				continue
 			}
-		case prompt.DefaultPromptTexts.EditSSHConnection:
-			HandleEdit(connectionFilePath, secretKeyFilePath)
-		case prompt.DefaultPromptTexts.RemoveSSHConnection:
-			if err := HandleRemove(connectionFilePath, secretKeyFilePath); err != nil {
-				fmt.Println(prompt.DefaultPromptTexts.ErrorMessages.FailedToLoadConfigX, err) // change to appropriate error message
+			if exitAfterSSH {
+				return nil
+			}
+		case prompttext.DefaultPromptTexts.AddSSHConnection:
+			if err := commands.HandleAdd(connectionFilePath, secretKeyFilePath); err != nil {
+				fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.FailedToAddConnectionX+"\n", err)
+			}
+		case prompttext.DefaultPromptTexts.EditSSHConnection:
+			if err := commands.HandleEdit(connectionFilePath, secretKeyFilePath); err != nil {
+				fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.FailedToStoreUpdatedConnectionsX+"\n", err)
+			}
+		case prompttext.DefaultPromptTexts.RemoveSSHConnection:
+			if err := commands.HandleRemove(connectionFilePath, secretKeyFilePath); err != nil {
+				fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.FailedToStoreUpdatedConnectionsX+"\n", err)
 			}
 		}
 	}

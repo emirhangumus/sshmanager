@@ -1,49 +1,42 @@
 package startup
 
 import (
-	"github.com/emirhangumus/sshmanager/internal/cli/flag"
-	"github.com/emirhangumus/sshmanager/internal/encryption"
+	"fmt"
+
+	"github.com/emirhangumus/sshmanager/internal/config"
+	cryptoutil "github.com/emirhangumus/sshmanager/internal/crypto"
 	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/emirhangumus/sshmanager/internal/store"
 )
 
-func Startup(connectionFilePath string, configFilePath string, secretKeyFilePath string) error {
-
-	// ----------- Create config file if it does not exist ----------- //
-	if err := storage.CreateFileIfNotExists(configFilePath); err != nil {
+func Setup(connectionFilePath, configFilePath, secretKeyFilePath string) error {
+	if err := storage.CreateFileIfNotExists(configFilePath, 0o600); err != nil {
 		return err
 	}
 
-	// ----------- Create connection file if it does not exist ----------- //
-	if err := storage.CreateFileIfNotExists(connectionFilePath); err != nil {
+	if err := storage.CreateFileIfNotExists(connectionFilePath, 0o600); err != nil {
 		return err
 	}
 
-	key, err := encryption.LoadKey(secretKeyFilePath)
+	if _, err := cryptoutil.LoadKey(secretKeyFilePath); err != nil {
+		return err
+	}
+
+	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath)
+	if err := connStore.InitializeIfEmpty(); err != nil {
+		return fmt.Errorf("failed to initialize connection store: %w", err)
+	}
+
+	isConfigEmpty, err := storage.IsFileEmpty(configFilePath)
 	if err != nil {
 		return err
 	}
-
-	isEmpty, err := storage.IsFileEmpty(connectionFilePath)
-	if err != nil {
-		return err
-	}
-
-	if isEmpty {
-		storage.EncryptAndStoreFile("", connectionFilePath, key) // Ensure the key is valid by encrypting an empty string
-	}
-
-	// ----------- If config file is empty, fill with default values ----------- //
-	if isEmpty, err := storage.IsFileEmpty(configFilePath); err != nil {
-		return err
-	} else if isEmpty {
-		config := flag.SSHManagerConfig{}
-		config.SetDefault()
-		if err := storage.WriteYAMLFile(configFilePath, config); err != nil {
+	if isConfigEmpty {
+		cfg := config.Default()
+		if err := config.SaveConfig(configFilePath, cfg); err != nil {
 			return err
 		}
 	}
 
-	ensureShellCompletion()
-	
 	return nil
 }
