@@ -41,11 +41,17 @@ func SetConfig(configFilePath, configName, configValue string) error {
 
 	switch configName {
 	case "behaviour.continueAfterSSHExit":
-		v, err := parseBoolValue(configValue)
+		v, err := parseBoolValue(configName, configValue)
 		if err != nil {
 			return err
 		}
 		cfg.Behaviour.ContinueAfterSSHExit = v
+	case "behaviour.showCredentialsOnConnect":
+		v, err := parseBoolValue(configName, configValue)
+		if err != nil {
+			return err
+		}
+		cfg.Behaviour.ShowCredentialsOnConnect = v
 	default:
 		return errors.New("unknown configuration name: " + configName)
 	}
@@ -53,10 +59,10 @@ func SetConfig(configFilePath, configName, configValue string) error {
 	return SaveConfig(configFilePath, cfg)
 }
 
-func parseBoolValue(v string) (bool, error) {
+func parseBoolValue(configName, v string) (bool, error) {
 	parsed, err := strconv.ParseBool(strings.ToLower(strings.TrimSpace(v)))
 	if err != nil {
-		return false, errors.New("invalid value for behaviour.continueAfterSSHExit, expected 'true' or 'false'")
+		return false, fmt.Errorf("invalid value for %s, expected 'true' or 'false'", configName)
 	}
 	return parsed, nil
 }

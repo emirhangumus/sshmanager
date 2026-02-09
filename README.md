@@ -73,7 +73,8 @@ sshmanager -version
 - Set config value:
 
 ```bash
-sshmanager -set behaviour.continueAfterSSHExit true
+sshmanager -set behaviour.continueAfterSSHExit false
+sshmanager -set behaviour.showCredentialsOnConnect false
 ```
 
 - Completion candidates (used by shell completion scripts):
@@ -107,6 +108,7 @@ source ~/.bashrc
 | Key | Default | Type | Description |
 |---|---|---|---|
 | `behaviour.continueAfterSSHExit` | `false` | boolean | If `true`, return to menu after SSH exits. If `false`, exit the app after SSH session ends. |
+| `behaviour.showCredentialsOnConnect` | `false` | boolean | If `true`, prints username and password before opening SSH connection. |
 
 ## Data files
 

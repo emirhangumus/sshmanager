@@ -49,7 +49,7 @@ func Run(args []string, build BuildInfo) error {
 	}
 
 	if len(args) == 2 && !strings.HasPrefix(args[1], "-") {
-		if err := commands.FindAndConnect(connectionFilePath, secretKeyFilePath, args[1]); err != nil {
+		if err := commands.FindAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, args[1]); err != nil {
 			return err
 		}
 		return nil

@@ -1,7 +1,8 @@
 package config
 
 type BehaviourConfig struct {
-	ContinueAfterSSHExit bool `yaml:"continueAfterSSHExit"`
+	ContinueAfterSSHExit     bool `yaml:"continueAfterSSHExit"`
+	ShowCredentialsOnConnect bool `yaml:"showCredentialsOnConnect"`
 }
 
 type SSHManagerConfig struct {
@@ -11,7 +12,8 @@ type SSHManagerConfig struct {
 func Default() SSHManagerConfig {
 	return SSHManagerConfig{
 		Behaviour: BehaviourConfig{
-			ContinueAfterSSHExit: false,
+			ContinueAfterSSHExit:     false,
+			ShowCredentialsOnConnect: false,
 		},
 	}
 }

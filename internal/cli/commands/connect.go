@@ -38,6 +38,8 @@ func HandleConnect(connectionFilePath, secretKeyFilePath string, cfg *config.SSH
 		return false, nil
 	}
 
+	printCredentialsIfEnabled(conn, cfg)
+
 	if err := connect(conn); err != nil {
 		fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.ConnectionToXFailedX+"\n", fmt.Sprintf("%s@%s", conn.Username, conn.Host), err)
 		return false, nil
@@ -60,4 +62,13 @@ func connect(conn *model.SSHConnection) error {
 	cmd.Env = append(os.Environ(), "SSHPASS="+conn.Password)
 
 	return cmd.Run()
+}
+
+func printCredentialsIfEnabled(conn *model.SSHConnection, cfg *config.SSHManagerConfig) {
+	if cfg == nil || !cfg.Behaviour.ShowCredentialsOnConnect {
+		return
+	}
+
+	fmt.Printf("Username: %s\n", conn.Username)
+	fmt.Printf("Password: %s\n", conn.Password)
 }
