@@ -15,34 +15,25 @@ LDFLAGS := -s -w -X main.version=$(VERSION) -X main.commit=$(COMMIT) -X main.bui
 GOOS := $(shell go env GOOS)
 GOARCH := $(shell go env GOARCH)
 
-# Colors for output
-GREEN := \033[32m
-YELLOW := \033[33m
-RED := \033[31m
-BLUE := \033[34m
-RESET := \033[0m
-
-# Default target
 .DEFAULT_GOAL := help
 
-.PHONY: all build build-compressed install install-compressed run remove clean test lint fmt vet mod-tidy mod-download deps release snapshot check-sshpass check-upx check-goreleaser help
+.PHONY: all help info build build-compressed install install-compressed run remove clean test test-coverage lint fmt vet mod-tidy mod-download deps release snapshot check-sshpass check-upx check-goreleaser
 
-## Show help
 help:
-	@echo "$(BLUE)$(APP_NAME) - SSH Manager$(RESET)"
+	@echo "$(APP_NAME) - SSH Manager"
 	@echo ""
-	@echo "$(GREEN)Build Commands:$(RESET)"
+	@echo "Build Commands:"
 	@echo "  make build              - Build the binary"
 	@echo "  make build-compressed   - Build and compress with UPX"
 	@echo "  make release            - Create release with GoReleaser"
 	@echo "  make snapshot           - Create snapshot release"
 	@echo ""
-	@echo "$(GREEN)Install Commands:$(RESET)"
+	@echo "Install Commands:"
 	@echo "  make install            - Install binary to $(INSTALL_PATH)"
 	@echo "  make install-compressed - Install compressed binary"
 	@echo "  make remove             - Remove installed binary"
 	@echo ""
-	@echo "$(GREEN)Development Commands:$(RESET)"
+	@echo "Development Commands:"
 	@echo "  make run                - Build and run the application"
 	@echo "  make test               - Run tests"
 	@echo "  make test-coverage      - Run tests with coverage"
@@ -50,156 +41,126 @@ help:
 	@echo "  make fmt                - Format code with gofmt"
 	@echo "  make vet                - Run go vet"
 	@echo ""
-	@echo "$(GREEN)Dependency Commands:$(RESET)"
-	@echo "  make deps               - Install all dependencies"
+	@echo "Dependency Commands:"
+	@echo "  make deps               - Verify tool dependencies"
 	@echo "  make mod-tidy           - Tidy go modules"
 	@echo "  make mod-download       - Download go modules"
 	@echo ""
-	@echo "$(GREEN)Utility Commands:$(RESET)"
+	@echo "Utility Commands:"
 	@echo "  make clean              - Clean build artifacts"
 	@echo "  make info               - Show build information"
 
-## Build information
 info:
-	@echo "$(BLUE)Build Information:$(RESET)"
-	@echo "  App Name:    $(APP_NAME)"
-	@echo "  Version:     $(VERSION)"
-	@echo "  Commit:      $(COMMIT)"
-	@echo "  Build Time:  $(BUILD_TIME)"
-	@echo "  GOOS:        $(GOOS)"
-	@echo "  GOARCH:      $(GOARCH)"
+	@echo "Build Information:"
+	@echo "  App Name:     $(APP_NAME)"
+	@echo "  Version:      $(VERSION)"
+	@echo "  Commit:       $(COMMIT)"
+	@echo "  Build Time:   $(BUILD_TIME)"
+	@echo "  GOOS:         $(GOOS)"
+	@echo "  GOARCH:       $(GOARCH)"
 	@echo "  Install Path: $(INSTALL_PATH)"
 
-## Build the binary
 build:
-	@echo "$(GREEN)Building $(APP_NAME)...$(RESET)"
+	@echo "Building $(APP_NAME)..."
 	@mkdir -p $(BIN_DIR)
 	@go build -ldflags="$(LDFLAGS)" -o $(BIN_DIR)/$(BIN_NAME) $(CMD_PATH)
-	@echo "$(GREEN)✓ Build complete: $(BIN_DIR)/$(BIN_NAME)$(RESET)"
+	@echo "✓ Build complete: $(BIN_DIR)/$(BIN_NAME)"
 
-## Build and compress the binary
 build-compressed: check-upx build
-	@echo "$(GREEN)Compressing binary with UPX...$(RESET)"
+	@echo "Compressing binary with UPX..."
 	@upx --best --lzma $(BIN_DIR)/$(BIN_NAME)
-	@echo "$(GREEN)✓ Compressed binary with UPX$(RESET)"
+	@echo "✓ Compressed binary with UPX"
 
-## Install the binary
 install: check-sshpass build
-	@echo "$(GREEN)Installing $(APP_NAME)...$(RESET)"
+	@echo "Installing $(APP_NAME)..."
 	@mkdir -p $(INSTALL_PATH)
 	@cp $(BIN_DIR)/$(BIN_NAME) $(INSTALL_PATH)
 	@chmod +x $(INSTALL_PATH)/$(BIN_NAME)
-	@echo "$(GREEN)✓ Installed to $(INSTALL_PATH)$(RESET)"
-	@echo "$(YELLOW)Make sure $(INSTALL_PATH) is in your PATH$(RESET)"
+	@echo "✓ Installed to $(INSTALL_PATH)"
+	@echo "Make sure $(INSTALL_PATH) is in your PATH"
 
-## Install the compressed binary
 install-compressed: check-sshpass build-compressed
-	@echo "$(GREEN)Installing compressed $(APP_NAME)...$(RESET)"
+	@echo "Installing compressed $(APP_NAME)..."
 	@mkdir -p $(INSTALL_PATH)
 	@cp $(BIN_DIR)/$(BIN_NAME) $(INSTALL_PATH)
 	@chmod +x $(INSTALL_PATH)/$(BIN_NAME)
-	@echo "$(GREEN)✓ Compressed binary installed to $(INSTALL_PATH)$(RESET)"
+	@echo "✓ Compressed binary installed to $(INSTALL_PATH)"
 
-## Run the binary
 run: build
-	@echo "$(GREEN)Running $(APP_NAME)...$(RESET)"
+	@echo "Running $(APP_NAME)..."
 	@$(BIN_DIR)/$(BIN_NAME)
 
-## Remove the installed binary
 remove:
-	@echo "$(YELLOW)Removing $(APP_NAME)...$(RESET)"
+	@echo "Removing $(APP_NAME)..."
 	@rm -f $(INSTALL_PATH)/$(BIN_NAME)
-	@echo "$(GREEN)✓ Removed from $(INSTALL_PATH)$(RESET)"
+	@echo "✓ Removed from $(INSTALL_PATH)"
 
-## Clean build artifacts
 clean:
-	@echo "$(YELLOW)Cleaning build artifacts...$(RESET)"
-	@rm -rf $(BIN_DIR) dist/
-	@go clean -cache -testcache -modcache
-	@echo "$(GREEN)✓ Cleaned build artifacts$(RESET)"
+	@echo "Cleaning build artifacts..."
+	@rm -rf $(BIN_DIR) dist/ coverage.out coverage.html
+	@go clean -cache -testcache
+	@echo "✓ Cleaned build artifacts"
 
-## Run tests
 test:
-	@echo "$(GREEN)Running tests...$(RESET)"
+	@echo "Running tests..."
 	@go test -v ./...
 
-## Run tests with coverage
 test-coverage:
-	@echo "$(GREEN)Running tests with coverage...$(RESET)"
+	@echo "Running tests with coverage..."
 	@go test -v -race -coverprofile=coverage.out ./...
 	@go tool cover -html=coverage.out -o coverage.html
-	@echo "$(GREEN)✓ Coverage report generated: coverage.html$(RESET)"
+	@echo "✓ Coverage report generated: coverage.html"
 
-## Run golangci-lint
 lint:
-	@echo "$(GREEN)Running golangci-lint...$(RESET)"
+	@echo "Running golangci-lint..."
 	@if command -v golangci-lint >/dev/null 2>&1; then \
-	    golangci-lint run; \
+		golangci-lint run; \
 	else \
-	    echo "$(RED)golangci-lint not found. Install it with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest$(RESET)"; \
+		echo "golangci-lint not found. Install with: go install github.com/golangci/golangci-lint/cmd/golangci-lint@latest"; \
+		exit 1; \
 	fi
 
-## Format code
 fmt:
-	@echo "$(GREEN)Formatting code...$(RESET)"
+	@echo "Formatting code..."
 	@go fmt ./...
-	@echo "$(GREEN)✓ Code formatted$(RESET)"
+	@echo "✓ Code formatted"
 
-## Run go vet
 vet:
-	@echo "$(GREEN)Running go vet...$(RESET)"
+	@echo "Running go vet..."
 	@go vet ./...
-	@echo "$(GREEN)✓ go vet passed$(RESET)"
+	@echo "✓ go vet passed"
 
-## Tidy go modules
 mod-tidy:
-	@echo "$(GREEN)Tidying go modules...$(RESET)"
+	@echo "Tidying go modules..."
 	@go mod tidy
-	@echo "$(GREEN)✓ Modules tidied$(RESET)"
+	@echo "✓ Modules tidied"
 
-## Download go modules
 mod-download:
-	@echo "$(GREEN)Downloading go modules...$(RESET)"
+	@echo "Downloading go modules..."
 	@go mod download
-	@echo "$(GREEN)✓ Modules downloaded$(RESET)"
+	@echo "✓ Modules downloaded"
 
-## Install all dependencies
 deps: check-sshpass check-upx check-goreleaser mod-download
-	@echo "$(GREEN)✓ All dependencies checked/installed$(RESET)"
+	@echo "✓ Dependencies verified"
 
-## Create release with GoReleaser
 release: check-goreleaser
-	@echo "$(GREEN)Creating release with GoReleaser...$(RESET)"
+	@echo "Creating release with GoReleaser..."
 	@goreleaser release --clean
-	@echo "$(GREEN)✓ Release created$(RESET)"
+	@echo "✓ Release created"
 
-## Create snapshot release
 snapshot: check-goreleaser
-	@echo "$(GREEN)Creating snapshot release...$(RESET)"
+	@echo "Creating snapshot release..."
 	@goreleaser release --snapshot --clean
-	@echo "$(GREEN)✓ Snapshot release created$(RESET)"
+	@echo "✓ Snapshot release created"
 
-## Check for sshpass
 check-sshpass:
-	@command -v sshpass >/dev/null 2>&1 && \
-	echo "$(GREEN)[✓] sshpass is installed$(RESET)" || \
-	(echo "$(YELLOW)[!] Installing sshpass...$(RESET)" && \
-	sudo apt update && sudo apt install sshpass -y && \
-	echo "$(GREEN)[✓] sshpass installed$(RESET)")
+	@command -v sshpass >/dev/null 2>&1 || (echo "sshpass is required but not installed." && exit 1)
+	@echo "[✓] sshpass is installed"
 
-## Check for upx
 check-upx:
-	@command -v upx >/dev/null 2>&1 && \
-	echo "$(GREEN)[✓] upx is installed$(RESET)" || \
-	(echo "$(YELLOW)[!] Installing upx...$(RESET)" && \
-	sudo apt update && sudo apt install upx -y && \
-	echo "$(GREEN)[✓] upx installed$(RESET)")
+	@command -v upx >/dev/null 2>&1 || (echo "upx is required for compressed builds but not installed." && exit 1)
+	@echo "[✓] upx is installed"
 
-## Check for goreleaser
 check-goreleaser:
-	@command -v goreleaser >/dev/null 2>&1 && \
-	echo "$(GREEN)[✓] goreleaser is installed$(RESET)" || \
-	(echo "$(YELLOW)[!] Installing goreleaser...$(RESET)" && \
-	echo 'deb [trusted=yes] https://repo.goreleaser.com/apt/ /' | sudo tee /etc/apt/sources.list.d/goreleaser.list && \
-	sudo apt update && sudo apt install goreleaser -y && \
-	echo "$(GREEN)[✓] goreleaser installed$(RESET)")
+	@command -v goreleaser >/dev/null 2>&1 || (echo "goreleaser is required for release targets but not installed." && exit 1)
+	@echo "[✓] goreleaser is installed"
