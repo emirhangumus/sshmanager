@@ -3,9 +3,9 @@ package store
 import (
 	"fmt"
 	"os"
-	"path/filepath"
 
 	cryptoutil "github.com/emirhangumus/sshmanager/internal/crypto"
+	"github.com/emirhangumus/sshmanager/internal/storage"
 )
 
 func encryptAndStoreFile(data, filePath string, key []byte) error {
@@ -14,10 +14,7 @@ func encryptAndStoreFile(data, filePath string, key []byte) error {
 		return err
 	}
 
-	if err := os.MkdirAll(filepath.Dir(filePath), 0o700); err != nil {
-		return fmt.Errorf("failed to create parent directory: %w", err)
-	}
-	if err := os.WriteFile(filePath, encryptedData, 0o600); err != nil {
+	if err := storage.WriteFileAtomic(filePath, encryptedData, 0o600); err != nil {
 		return fmt.Errorf("failed to write encrypted file: %w", err)
 	}
 	return nil

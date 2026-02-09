@@ -1,9 +1,13 @@
 package commands
 
 import (
+	"flag"
 	"fmt"
+	"io"
 	"os"
 	"os/exec"
+	"strconv"
+	"strings"
 
 	"github.com/emirhangumus/sshmanager/internal/config"
 	"github.com/emirhangumus/sshmanager/internal/model"
@@ -28,6 +32,9 @@ func HandleConnect(connectionFilePath, secretKeyFilePath string, cfg *config.SSH
 	selector := promptui.Select{Label: prompttext.DefaultPromptTexts.SelectAnSSHConnection, Items: items}
 	idx, _, err := selector.Run()
 	if err != nil {
+		if prompttext.IsCancelError(err) {
+			fmt.Println(prompttext.DefaultPromptTexts.SuccessMessages.OperationCancelled)
+		}
 		return false, nil
 	}
 
@@ -48,20 +55,139 @@ func HandleConnect(connectionFilePath, secretKeyFilePath string, cfg *config.SSH
 	return !cfg.Behaviour.ContinueAfterSSHExit, nil
 }
 
-func connect(conn *model.SSHConnection) error {
-	sshpassPath, err := exec.LookPath("sshpass")
-	if err != nil {
-		return fmt.Errorf(prompttext.DefaultPromptTexts.ErrorMessages.SSHPassNotFound)
+func HandleConnectArgs(connectionFilePath, secretKeyFilePath, configFilePath string, args []string) error {
+	return handleConnectArgs(connectionFilePath, secretKeyFilePath, configFilePath, args)
+}
+
+func handleConnectArgs(connectionFilePath, secretKeyFilePath, configFilePath string, args []string) error {
+	fs := flag.NewFlagSet("connect", flag.ContinueOnError)
+	fs.SetOutput(io.Discard)
+
+	alias := fs.String("alias", "", "Connection alias")
+	id := fs.String("id", "", "Connection ID")
+
+	if err := fs.Parse(args); err != nil {
+		return err
 	}
 
-	sshTarget := fmt.Sprintf("%s@%s", conn.Username, conn.Host)
-	cmd := exec.Command(sshpassPath, "-e", "ssh", sshTarget)
+	selectedAlias, selectedID, err := resolveSelector(*alias, *id, fs.Args(), "connect")
+	if err != nil {
+		return err
+	}
+
+	if selectedAlias == "" && selectedID == "" {
+		cfg, err := config.LoadConfig(configFilePath)
+		if err != nil {
+			return err
+		}
+		_, err = HandleConnect(connectionFilePath, secretKeyFilePath, &cfg)
+		return err
+	}
+
+	if selectedID != "" {
+		return FindAndConnectByID(connectionFilePath, secretKeyFilePath, configFilePath, selectedID)
+	}
+	return FindAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, selectedAlias)
+}
+
+func connect(conn *model.SSHConnection) error {
+	bin, args, envAdd, err := buildConnectInvocation(conn)
+	if err != nil {
+		return err
+	}
+
+	binPath, err := exec.LookPath(bin)
+	if err != nil {
+		if bin == "sshpass" {
+			return fmt.Errorf(prompttext.DefaultPromptTexts.ErrorMessages.SSHPassNotFound)
+		}
+		return fmt.Errorf("required command %q not found in PATH", bin)
+	}
+
+	cmd := exec.Command(binPath, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), "SSHPASS="+conn.Password)
+	cmd.Env = append(os.Environ(), envAdd...)
 
 	return cmd.Run()
+}
+
+func buildConnectInvocation(conn *model.SSHConnection) (string, []string, []string, error) {
+	username := strings.TrimSpace(conn.Username)
+	host := strings.TrimSpace(conn.Host)
+	if username == "" || host == "" {
+		return "", nil, nil, fmt.Errorf("username and host are required")
+	}
+
+	target := fmt.Sprintf("%s@%s", username, host)
+	port := strconv.Itoa(conn.EffectivePort())
+	authMode := conn.EffectiveAuthMode()
+	advancedArgs, err := buildAdvancedSSHArgs(conn)
+	if err != nil {
+		return "", nil, nil, err
+	}
+
+	switch authMode {
+	case model.AuthModePassword:
+		password := conn.Password
+		if password == "" {
+			return "", nil, nil, fmt.Errorf("password is required when auth mode is %q", model.AuthModePassword)
+		}
+		sshArgs := []string{"-p", port}
+		sshArgs = append(sshArgs, advancedArgs...)
+		sshArgs = append(sshArgs, target)
+		return "sshpass", append([]string{"-e", "ssh"}, sshArgs...), []string{"SSHPASS=" + password}, nil
+	case model.AuthModeKey:
+		identity := strings.TrimSpace(conn.IdentityFile)
+		if identity == "" {
+			return "", nil, nil, fmt.Errorf("identityFile is required when auth mode is %q", model.AuthModeKey)
+		}
+		sshArgs := []string{"-p", port, "-i", identity}
+		sshArgs = append(sshArgs, advancedArgs...)
+		sshArgs = append(sshArgs, target)
+		return "ssh", sshArgs, nil, nil
+	case model.AuthModeAgent:
+		sshArgs := []string{"-p", port}
+		sshArgs = append(sshArgs, advancedArgs...)
+		sshArgs = append(sshArgs, target)
+		return "ssh", sshArgs, nil, nil
+	default:
+		return "", nil, nil, fmt.Errorf("unsupported auth mode: %s", authMode)
+	}
+}
+
+func buildAdvancedSSHArgs(conn *model.SSHConnection) ([]string, error) {
+	proxyJump := strings.TrimSpace(conn.ProxyJump)
+	localForwards := model.NormalizeStringList(conn.LocalForwards)
+	remoteForwards := model.NormalizeStringList(conn.RemoteForwards)
+	extraArgs := model.NormalizeStringList(conn.ExtraSSHArgs)
+
+	if err := model.ValidateProxyJump(proxyJump); err != nil {
+		return nil, fmt.Errorf("invalid proxy jump: %w", err)
+	}
+	if err := model.ValidateForwardSpecs(localForwards); err != nil {
+		return nil, fmt.Errorf("invalid local forwards: %w", err)
+	}
+	if err := model.ValidateForwardSpecs(remoteForwards); err != nil {
+		return nil, fmt.Errorf("invalid remote forwards: %w", err)
+	}
+	if err := model.ValidateExtraSSHArgs(extraArgs); err != nil {
+		return nil, fmt.Errorf("invalid extra ssh args: %w", err)
+	}
+
+	args := make([]string, 0, 2+2*len(localForwards)+2*len(remoteForwards)+len(extraArgs))
+	if proxyJump != "" {
+		args = append(args, "-J", proxyJump)
+	}
+	for _, spec := range localForwards {
+		args = append(args, "-L", spec)
+	}
+	for _, spec := range remoteForwards {
+		args = append(args, "-R", spec)
+	}
+	args = append(args, extraArgs...)
+	return args, nil
 }
 
 func printCredentialsIfEnabled(conn *model.SSHConnection, cfg *config.SSHManagerConfig) {

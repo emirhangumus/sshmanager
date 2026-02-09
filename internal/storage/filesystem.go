@@ -89,8 +89,58 @@ func WriteYAMLFile(filePath string, data interface{}, fileMode os.FileMode) erro
 		return fmt.Errorf("failed to marshal data to YAML: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, dataBytes, fileMode); err != nil {
+	if err := WriteFileAtomic(filePath, dataBytes, fileMode); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
+	return nil
+}
+
+// WriteFileAtomic writes data to filePath by using a temp file and atomic rename.
+func WriteFileAtomic(filePath string, data []byte, fileMode os.FileMode) error {
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	tmpFile, err := os.CreateTemp(dir, "."+filepath.Base(filePath)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file in %s: %w", dir, err)
+	}
+
+	tmpPath := tmpFile.Name()
+	shouldCleanup := true
+	defer func() {
+		if shouldCleanup {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err := tmpFile.Chmod(fileMode); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to set mode on temporary file %s: %w", tmpPath, err)
+	}
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to write temporary file %s: %w", tmpPath, err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to sync temporary file %s: %w", tmpPath, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file %s: %w", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, filePath); err != nil {
+		return fmt.Errorf("failed to atomically replace %s: %w", filePath, err)
+	}
+	shouldCleanup = false
+
+	// Best-effort directory sync for stronger durability guarantees.
+	if dirHandle, err := os.Open(dir); err == nil {
+		_ = dirHandle.Sync()
+		_ = dirHandle.Close()
+	}
+
 	return nil
 }

@@ -124,6 +124,9 @@ func confirmInstall(shell string) (bool, error) {
 	p := promptui.Prompt{Label: fmt.Sprintf("Install %s completion into your home directory? Type 'yes' to continue", shell)}
 	v, err := p.Run()
 	if err != nil {
+		if prompttext.IsCancelError(err) {
+			return false, nil
+		}
 		return false, err
 	}
 	return strings.TrimSpace(strings.ToLower(v)) == "yes", nil

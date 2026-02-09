@@ -4,9 +4,51 @@ on:
   push:
   pull_request:
 
+permissions:
+  contents: read
+
 jobs:
-  test:
+  quality:
     runs-on: ubuntu-latest
+    env:
+      COVERAGE_MIN: "35.0"
+
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Go
+        uses: actions/setup-go@v5
+        with:
+          go-version-file: go.mod
+
+      - name: Run tests with race detector
+        run: go test -race ./...
+
+      - name: Run tests with coverage
+        run: go test -coverprofile=coverage.out ./...
+
+      - name: Enforce minimum coverage
+        run: |
+          total_cov="$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')"
+          echo "Total coverage: ${total_cov}%"
+          awk -v cov="${total_cov}" -v min="${COVERAGE_MIN}" 'BEGIN { if (cov+0 < min+0) { printf("Coverage %.1f%% is below minimum %.1f%%\n", cov, min); exit 1 } }'
+
+      - name: Run vet
+        run: go vet ./...
+
+      - name: Run golangci-lint
+        uses: golangci/golangci-lint-action@v6
+        with:
+          version: latest
+
+  cross-platform:
+    name: Cross-platform tests (${{ matrix.os }})
+    runs-on: ${{ matrix.os }}
+    strategy:
+      fail-fast: false
+      matrix:
+        os: [ubuntu-latest, macos-latest, windows-latest]
 
     steps:
       - name: Checkout
@@ -19,11 +61,3 @@ jobs:
 
       - name: Run tests
         run: go test ./...
-
-      - name: Run vet
-        run: go vet ./...
-
-      - name: Run golangci-lint
-        uses: golangci/golangci-lint-action@v6
-        with:
-          version: latest
