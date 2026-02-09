@@ -8,7 +8,6 @@ import (
 	"strings"
 
 	"github.com/emirhangumus/sshmanager/internal/model"
-	"github.com/manifoldco/promptui"
 )
 
 var (
@@ -298,23 +297,19 @@ func EditSSHConnectionPrompt(conn *model.SSHConnection) (model.SSHConnection, er
 }
 
 func runValidatedPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateText}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateText)
 }
 
 func runHostPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateHost}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateHost)
 }
 
 func runPortPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validatePort}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validatePort)
 }
 
 func runAuthModePrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateAuthMode}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateAuthMode)
 }
 
 func runPasswordPrompt(label, defaultValue string, required bool) (string, error) {
@@ -322,18 +317,15 @@ func runPasswordPrompt(label, defaultValue string, required bool) (string, error
 	if required {
 		validator = validateText
 	}
-	p := promptui.Prompt{Label: label, Default: defaultValue, Mask: '*', Validate: validator}
-	return p.Run()
+	return InputPrompt(label, defaultValue, true, validator)
 }
 
 func runPlainPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, nil)
 }
 
 func runAliasPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateAlias}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateAlias)
 }
 
 func runIdentityFilePrompt(label, defaultValue string, required bool) (string, error) {
@@ -341,33 +333,27 @@ func runIdentityFilePrompt(label, defaultValue string, required bool) (string, e
 	if required {
 		validator = validateText
 	}
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validator}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validator)
 }
 
 func runProxyJumpPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateProxyJump}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateProxyJump)
 }
 
 func runForwardListPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateForwardList}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateForwardList)
 }
 
 func runExtraSSHArgsPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateExtraSSHArgs}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateExtraSSHArgs)
 }
 
 func runGroupPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateGroup}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateGroup)
 }
 
 func runTagsPrompt(label, defaultValue string) (string, error) {
-	p := promptui.Prompt{Label: label, Default: defaultValue, Validate: validateTags}
-	return p.Run()
+	return InputPrompt(label, defaultValue, false, validateTags)
 }
 
 func normalizeConnection(conn model.SSHConnection) model.SSHConnection {

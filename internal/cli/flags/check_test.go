@@ -12,42 +12,53 @@ import (
 	"github.com/emirhangumus/sshmanager/internal/store"
 )
 
-func TestCheckNoFlagsContinuesExecution(t *testing.T) {
-	continueExecution, err := Check(nil, "", "", "", "v1.2.3")
-	if err != nil {
-		t.Fatalf("Check returned error: %v", err)
+func TestPrintUsageUsesSubcommandsWithoutDashes(t *testing.T) {
+	var out strings.Builder
+	PrintUsage(&out)
+
+	text := out.String()
+	for _, cmd := range []string{
+		"  add [flags]",
+		"  edit [flags]",
+		"  remove [flags]",
+		"  rename [flags]",
+		"  connect [flags]",
+		"  list [flags]",
+		"  export --out <path> [--format yaml|json]",
+		"  import --in <path> [--format auto|yaml|json] [--mode merge|replace]",
+		"  backup --out <path> [--format yaml|json] [--include-config=true|false]",
+		"  restore --in <path> [--format auto|yaml|json] [--mode merge|replace] [--with-config=true|false]",
+		"  doctor [--json]",
+		"  clean",
+		"  set <config-name> <config-value>",
+		"  version",
+		"  complete [prefix]",
+		"  completion <bash|zsh>",
+		"  help",
+	} {
+		if !strings.Contains(text, cmd) {
+			t.Fatalf("expected usage to include %q, got %q", cmd, text)
+		}
 	}
-	if !continueExecution {
-		t.Fatal("expected continueExecution=true when no flags are provided")
+	if strings.Contains(text, "  -clean") {
+		t.Fatalf("usage should not include dash-prefixed clean option, got %q", text)
 	}
 }
 
-func TestCheckVersionStopsExecution(t *testing.T) {
-	continueExecution, err := Check([]string{"-version"}, "", "", "", "v9.9.9")
-	if err != nil {
-		t.Fatalf("Check returned error: %v", err)
-	}
-	if continueExecution {
-		t.Fatal("expected continueExecution=false for -version")
+func TestHandleVersionWritesVersion(t *testing.T) {
+	var out strings.Builder
+	HandleVersion("v9.9.9", &out)
+	if strings.TrimSpace(out.String()) != "v9.9.9" {
+		t.Fatalf("unexpected version output: %q", out.String())
 	}
 }
 
-func TestCheckSetConfigUpdatesValue(t *testing.T) {
+func TestHandleSetUpdatesValue(t *testing.T) {
 	tmpDir := t.TempDir()
 	configPath := filepath.Join(tmpDir, "config.yaml")
 
-	continueExecution, err := Check(
-		[]string{"-set", "behaviour.continueAfterSSHExit", "true"},
-		filepath.Join(tmpDir, "conn"),
-		filepath.Join(tmpDir, "secret.key"),
-		configPath,
-		"dev",
-	)
-	if err != nil {
-		t.Fatalf("Check returned error: %v", err)
-	}
-	if continueExecution {
-		t.Fatal("expected continueExecution=false for -set")
+	if err := HandleSet(configPath, []string{"behaviour.continueAfterSSHExit", "true"}); err != nil {
+		t.Fatalf("HandleSet returned error: %v", err)
 	}
 
 	cfg, err := config.LoadConfig(configPath)
@@ -55,45 +66,40 @@ func TestCheckSetConfigUpdatesValue(t *testing.T) {
 		t.Fatalf("LoadConfig returned error: %v", err)
 	}
 	if !cfg.Behaviour.ContinueAfterSSHExit {
-		t.Fatal("expected behaviour.continueAfterSSHExit=true after -set")
+		t.Fatal("expected behaviour.continueAfterSSHExit=true after set")
 	}
 }
 
-func TestCheckSetConfigRejectsMissingArgs(t *testing.T) {
-	continueExecution, err := Check([]string{"-set", "behaviour.continueAfterSSHExit"}, "", "", "", "dev")
+func TestHandleSetRejectsMissingArgs(t *testing.T) {
+	err := HandleSet(filepath.Join(t.TempDir(), "config.yaml"), []string{"behaviour.continueAfterSSHExit"})
 	if err == nil {
-		t.Fatal("expected error for missing -set value, got nil")
-	}
-	if continueExecution {
-		t.Fatal("expected continueExecution=false when parsing -set fails")
+		t.Fatal("expected error for missing set value, got nil")
 	}
 }
 
-func TestCheckCompletionBashStopsExecution(t *testing.T) {
-	continueExecution, err := Check([]string{"-completion", "bash"}, "", "", "", "dev")
-	if err != nil {
-		t.Fatalf("Check returned error: %v", err)
-	}
-	if continueExecution {
-		t.Fatal("expected continueExecution=false for -completion bash")
+func TestHandleCompletionBash(t *testing.T) {
+	output := captureStdout(t, func() {
+		if err := HandleCompletion([]string{"bash"}); err != nil {
+			t.Fatalf("HandleCompletion returned error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "_sshmanager") {
+		t.Fatalf("expected bash completion function output, got %q", output)
 	}
 }
 
-func TestCheckCompletionInstallRequiresShellArg(t *testing.T) {
-	continueExecution, err := Check([]string{"-completion", "install"}, "", "", "", "dev")
+func TestHandleCompletionInstallRequiresShellArg(t *testing.T) {
+	err := HandleCompletion([]string{"install"})
 	if err == nil {
 		t.Fatal("expected error when install shell is missing")
 	}
-	if continueExecution {
-		t.Fatal("expected continueExecution=false for failing -completion install")
-	}
 }
 
-func TestCheckCompletePrintsMatchingAliases(t *testing.T) {
+func TestHandleCompletePrintsMatchingAliases(t *testing.T) {
 	tmpDir := t.TempDir()
 	connPath := filepath.Join(tmpDir, "conn")
 	keyPath := filepath.Join(tmpDir, "secret.key")
-	configPath := filepath.Join(tmpDir, "config.yaml")
 
 	connStore := store.NewConnectionStore(connPath, keyPath)
 	if err := connStore.InitializeIfEmpty(); err != nil {
@@ -123,12 +129,8 @@ func TestCheckCompletePrintsMatchingAliases(t *testing.T) {
 	}
 
 	output := captureStdout(t, func() {
-		continueExecution, err := Check([]string{"-complete", "prod"}, connPath, keyPath, configPath, "dev")
-		if err != nil {
-			t.Fatalf("Check returned error: %v", err)
-		}
-		if continueExecution {
-			t.Fatal("expected continueExecution=false for -complete")
+		if err := HandleComplete(connPath, keyPath, []string{"prod"}); err != nil {
+			t.Fatalf("HandleComplete returned error: %v", err)
 		}
 	})
 
@@ -137,6 +139,29 @@ func TestCheckCompletePrintsMatchingAliases(t *testing.T) {
 	}
 	if strings.Contains(output, "stage-api") {
 		t.Fatalf("expected output to exclude non-matching alias, got %q", output)
+	}
+}
+
+func TestMapLegacyDashCommand(t *testing.T) {
+	tests := map[string]string{
+		"-clean":      "clean",
+		"-complete":   "complete",
+		"-completion": "completion",
+		"-set":        "set",
+		"-version":    "version",
+	}
+	for in, want := range tests {
+		got, ok := MapLegacyDashCommand(in)
+		if !ok {
+			t.Fatalf("expected %q to map to %q", in, want)
+		}
+		if got != want {
+			t.Fatalf("unexpected mapping for %q: got %q want %q", in, got, want)
+		}
+	}
+
+	if _, ok := MapLegacyDashCommand("-unknown"); ok {
+		t.Fatal("unexpected mapping for unknown legacy option")
 	}
 }
 

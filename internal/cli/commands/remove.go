@@ -10,7 +10,6 @@ import (
 	"github.com/emirhangumus/sshmanager/internal/model"
 	"github.com/emirhangumus/sshmanager/internal/store"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
-	"github.com/manifoldco/promptui"
 )
 
 func HandleRemove(connectionFilePath, secretKeyFilePath string) error {
@@ -25,8 +24,11 @@ func HandleRemove(connectionFilePath, secretKeyFilePath string) error {
 	}
 
 	items := connFile.SelectItems()
-	selector := promptui.Select{Label: prompttext.DefaultPromptTexts.SelectAConnectionToRemove, Items: items}
-	idx, _, err := selector.Run()
+	labels := make([]string, len(items))
+	for i := range items {
+		labels[i] = items[i].Label
+	}
+	idx, _, err := prompttext.SelectPrompt(prompttext.DefaultPromptTexts.SelectAConnectionToRemove, labels)
 	if err != nil {
 		if prompttext.IsCancelError(err) {
 			fmt.Println(prompttext.DefaultPromptTexts.SuccessMessages.OperationCancelled)
@@ -126,10 +128,12 @@ func confirmRemove(conn *model.SSHConnection) (bool, error) {
 		target = fmt.Sprintf("%s (%s)", target, alias)
 	}
 
-	p := promptui.Prompt{
-		Label: fmt.Sprintf("Remove %s? Type 'yes' to continue", target),
-	}
-	value, err := p.Run()
+	value, err := prompttext.InputPrompt(
+		fmt.Sprintf("Remove %s? Type 'yes' to continue", target),
+		"",
+		false,
+		nil,
+	)
 	if err != nil {
 		if prompttext.IsCancelError(err) {
 			return false, nil

@@ -6,7 +6,6 @@ import (
 	"github.com/emirhangumus/sshmanager/internal/cli/commands"
 	"github.com/emirhangumus/sshmanager/internal/config"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
-	"github.com/manifoldco/promptui"
 )
 
 func ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath, version string) error {
@@ -25,8 +24,7 @@ func ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath, version
 	}
 
 	for {
-		selector := promptui.Select{Label: "Menu Options | " + version, Items: options}
-		_, choice, err := selector.Run()
+		_, choice, err := prompttext.SelectPrompt("Menu Options | "+version, options)
 		if err != nil {
 			if prompttext.IsCancelError(err) {
 				return nil

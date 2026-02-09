@@ -10,7 +10,6 @@ import (
 	"github.com/emirhangumus/sshmanager/internal/model"
 	"github.com/emirhangumus/sshmanager/internal/store"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
-	"github.com/manifoldco/promptui"
 )
 
 func HandleEdit(connectionFilePath, secretKeyFilePath string) error {
@@ -25,8 +24,11 @@ func HandleEdit(connectionFilePath, secretKeyFilePath string) error {
 	}
 
 	items := connFile.SelectItems()
-	selector := promptui.Select{Label: prompttext.DefaultPromptTexts.SelectAConnectionToEdit, Items: items}
-	idx, _, err := selector.Run()
+	labels := make([]string, len(items))
+	for i := range items {
+		labels[i] = items[i].Label
+	}
+	idx, _, err := prompttext.SelectPrompt(prompttext.DefaultPromptTexts.SelectAConnectionToEdit, labels)
 	if err != nil {
 		if prompttext.IsCancelError(err) {
 			fmt.Println(prompttext.DefaultPromptTexts.SuccessMessages.OperationCancelled)

@@ -20,7 +20,28 @@ func TestVersionStringDefaultsAndTrims(t *testing.T) {
 	}
 }
 
-func TestRunWithVersionFlag(t *testing.T) {
+func TestRunWithVersionSubcommand(t *testing.T) {
+	home := t.TempDir()
+	setHomeEnv(t, home)
+
+	output := captureStdout(t, func() {
+		err := Run([]string{"sshmanager", "version"}, BuildInfo{Version: "v1.2.3"})
+		if err != nil {
+			t.Fatalf("Run returned error: %v", err)
+		}
+	})
+
+	if !strings.Contains(output, "v1.2.3") {
+		t.Fatalf("expected version output, got %q", output)
+	}
+
+	dataDir := filepath.Join(home, ".sshmanager")
+	if _, err := os.Stat(dataDir); !os.IsNotExist(err) {
+		t.Fatalf("version command should not initialize data dir, stat err: %v", err)
+	}
+}
+
+func TestRunLegacyVersionFlagStillWorks(t *testing.T) {
 	home := t.TempDir()
 	setHomeEnv(t, home)
 
@@ -34,10 +55,32 @@ func TestRunWithVersionFlag(t *testing.T) {
 	if !strings.Contains(output, "v1.2.3") {
 		t.Fatalf("expected version output, got %q", output)
 	}
+}
 
-	assertExists(t, filepath.Join(home, ".sshmanager", "conn"))
-	assertExists(t, filepath.Join(home, ".sshmanager", "config.yaml"))
-	assertExists(t, filepath.Join(home, ".sshmanager", "secret.key"))
+func TestRunHelpShowsSubcommandStyleWithoutDashOptions(t *testing.T) {
+	home := t.TempDir()
+	setHomeEnv(t, home)
+
+	output := captureStdout(t, func() {
+		if err := Run([]string{"sshmanager", "--help"}, BuildInfo{}); err != nil {
+			t.Fatalf("Run(--help) returned error: %v", err)
+		}
+	})
+
+	for _, snippet := range []string{
+		"  add [flags]",
+		"  list [flags]",
+		"  doctor [--json]",
+		"  clean",
+		"  completion <bash|zsh>",
+	} {
+		if !strings.Contains(output, snippet) {
+			t.Fatalf("expected help output to include %q, got %q", snippet, output)
+		}
+	}
+	if strings.Contains(output, "  -clean") {
+		t.Fatalf("expected help output without dash-prefixed options, got %q", output)
+	}
 }
 
 func TestRunListSubcommandNoConnections(t *testing.T) {
@@ -275,11 +318,4 @@ func captureStdout(t *testing.T, fn func()) string {
 		t.Fatalf("failed to read captured stdout: %v", err)
 	}
 	return string(b)
-}
-
-func assertExists(t *testing.T, filePath string) {
-	t.Helper()
-	if _, err := os.Stat(filePath); err != nil {
-		t.Fatalf("expected file to exist: %s (%v)", filePath, err)
-	}
 }

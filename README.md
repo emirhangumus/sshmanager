@@ -13,7 +13,7 @@ SSH Manager is a terminal application for storing and connecting to SSH hosts fr
 - Lock-protected connection mutations to reduce concurrent write races
 - Add, edit, remove, and connect from an interactive menu
 - Direct alias connection (`sshmanager myserver`)
-- Scriptable subcommands: `add`, `edit`, `remove`, `connect`, `list`, `export`, `import`, `backup`, `restore`, `doctor`
+- Scriptable subcommands: `add`, `edit`, `remove`, `connect`, `list`, `export`, `import`, `backup`, `restore`, `doctor`, `clean`, `set`, `version`, `complete`, `completion`
 - Alias rename command (`rename`)
 - Grouping/tagging metadata with list filtering (`--group`, `--tag`)
 - Multiple SSH auth modes: `password`, `key`, `agent`
@@ -21,7 +21,7 @@ SSH Manager is a terminal application for storing and connecting to SSH hosts fr
 - Advanced SSH options: ProxyJump, local/remote forwarding, controlled extra args
 - Configurable post-SSH behavior (`behaviour.continueAfterSSHExit`)
 - Shell completion support for Bash and Zsh
-- Best-effort secure cleanup (`-clean`) for connection and key files
+- Best-effort secure cleanup (`clean`) for connection and key files
 
 ## Requirements
 
@@ -165,45 +165,45 @@ List field values:
 
 - `id`, `alias`, `username`, `host`, `port`, `auth-mode`, `identity-file`, `proxy-jump`, `local-forwards`, `remote-forwards`, `extra-ssh-args`, `group`, `tags`, `description`, `target`
 
-### Flags
+### Utility Commands
 
 - Clean data:
 
 ```bash
-sshmanager -clean
+sshmanager clean
 ```
 
 - Show version:
 
 ```bash
-sshmanager -version
+sshmanager version
 ```
 
 - Set config value:
 
 ```bash
-sshmanager -set behaviour.continueAfterSSHExit false
-sshmanager -set behaviour.showCredentialsOnConnect false
+sshmanager set behaviour.continueAfterSSHExit false
+sshmanager set behaviour.showCredentialsOnConnect false
 ```
 
 - Completion candidates (used by shell completion scripts):
 
 ```bash
-sshmanager -complete [prefix]
+sshmanager complete [prefix]
 ```
 
 - Print completion script:
 
 ```bash
-sshmanager -completion bash
-sshmanager -completion zsh
+sshmanager completion bash
+sshmanager completion zsh
 ```
 
 - Install completion script (explicit opt-in):
 
 ```bash
-sshmanager -completion install bash
-sshmanager -completion install zsh
+sshmanager completion install bash
+sshmanager completion install zsh
 ```
 
 For Bash, reload your shell after installation:

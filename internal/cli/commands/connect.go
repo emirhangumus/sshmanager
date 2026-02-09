@@ -13,7 +13,6 @@ import (
 	"github.com/emirhangumus/sshmanager/internal/model"
 	"github.com/emirhangumus/sshmanager/internal/store"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
-	"github.com/manifoldco/promptui"
 )
 
 // HandleConnect returns true when caller should exit app after SSH command exits.
@@ -29,8 +28,11 @@ func HandleConnect(connectionFilePath, secretKeyFilePath string, cfg *config.SSH
 	}
 
 	items := connFile.SelectItems()
-	selector := promptui.Select{Label: prompttext.DefaultPromptTexts.SelectAnSSHConnection, Items: items}
-	idx, _, err := selector.Run()
+	labels := make([]string, len(items))
+	for i := range items {
+		labels[i] = items[i].Label
+	}
+	idx, _, err := prompttext.SelectPrompt(prompttext.DefaultPromptTexts.SelectAnSSHConnection, labels)
 	if err != nil {
 		if prompttext.IsCancelError(err) {
 			fmt.Println(prompttext.DefaultPromptTexts.SuccessMessages.OperationCancelled)
