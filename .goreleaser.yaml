@@ -42,6 +42,7 @@ homebrew_casks:
     repository:
       owner: emirhangumus
       name: homebrew-tap
+      token: "{{ .Env.HOMEBREW_TAP_GITHUB_TOKEN }}"
 
 nfpms:
   - id: sshmanager
