@@ -3,9 +3,27 @@ package storage
 import (
 	"os"
 	"path/filepath"
+	"runtime"
 	"strings"
 	"testing"
 )
+
+// assertPerm checks exact POSIX permission bits. Skipped on Windows, where
+// NTFS has no equivalent to unix mode bits and os.FileMode.Perm() does not
+// reflect what was requested.
+func assertPerm(t *testing.T, path string, want os.FileMode) {
+	t.Helper()
+	if runtime.GOOS == "windows" {
+		return
+	}
+	info, err := os.Stat(path)
+	if err != nil {
+		t.Fatalf("failed to stat %s: %v", path, err)
+	}
+	if perms := info.Mode().Perm(); perms != want {
+		t.Fatalf("unexpected mode for %s: got %o, want %o", path, perms, want)
+	}
+}
 
 func TestWriteFileAtomicCreatesDirectoriesAndWritesData(t *testing.T) {
 	tmpDir := t.TempDir()
@@ -24,13 +42,7 @@ func TestWriteFileAtomicCreatesDirectoriesAndWritesData(t *testing.T) {
 		t.Fatalf("file content mismatch: got %q, want %q", string(got), string(payload))
 	}
 
-	info, err := os.Stat(filePath)
-	if err != nil {
-		t.Fatalf("failed to stat output file: %v", err)
-	}
-	if perms := info.Mode().Perm(); perms != 0o600 {
-		t.Fatalf("unexpected file mode: got %o, want %o", perms, 0o600)
-	}
+	assertPerm(t, filePath, 0o600)
 }
 
 func TestCreateFileIfNotExistsCreatesFileWithMode(t *testing.T) {
@@ -41,21 +53,8 @@ func TestCreateFileIfNotExistsCreatesFileWithMode(t *testing.T) {
 		t.Fatalf("CreateFileIfNotExists failed: %v", err)
 	}
 
-	info, err := os.Stat(filePath)
-	if err != nil {
-		t.Fatalf("failed to stat created file: %v", err)
-	}
-	if perms := info.Mode().Perm(); perms != 0o600 {
-		t.Fatalf("unexpected file mode: got %o, want %o", perms, 0o600)
-	}
-
-	dirInfo, err := os.Stat(filepath.Dir(filePath))
-	if err != nil {
-		t.Fatalf("failed to stat created directory: %v", err)
-	}
-	if perms := dirInfo.Mode().Perm(); perms != 0o700 {
-		t.Fatalf("unexpected directory mode: got %o, want %o", perms, 0o700)
-	}
+	assertPerm(t, filePath, 0o600)
+	assertPerm(t, filepath.Dir(filePath), 0o700)
 }
 
 func TestCreateFileIfNotExistsIsIdempotent(t *testing.T) {
@@ -157,13 +156,7 @@ func TestWriteYAMLFileAndReadYAMLFileRoundTrip(t *testing.T) {
 		t.Fatalf("WriteYAMLFile failed: %v", err)
 	}
 
-	info, err := os.Stat(filePath)
-	if err != nil {
-		t.Fatalf("failed to stat written file: %v", err)
-	}
-	if perms := info.Mode().Perm(); perms != 0o600 {
-		t.Fatalf("unexpected file mode: got %o, want %o", perms, 0o600)
-	}
+	assertPerm(t, filePath, 0o600)
 
 	var got sample
 	if err := ReadYAMLFile(filePath, &got); err != nil {

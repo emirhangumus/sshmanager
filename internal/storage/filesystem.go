@@ -53,17 +53,23 @@ func SecureDelete(path string) error {
 		}
 		return err
 	}
-	defer f.Close()
 
-	info, err := os.Stat(path)
-	if err == nil {
+	info, statErr := os.Stat(path)
+	if statErr == nil {
 		size := info.Size()
 		randomData := make([]byte, size)
 		if _, err := rand.Read(randomData); err == nil {
 			if _, err := f.Write(randomData); err != nil {
+				_ = f.Close()
 				return err
 			}
 		}
+	}
+
+	// The file handle must be closed before removal: Windows refuses to
+	// remove a file that still has an open handle.
+	if err := f.Close(); err != nil {
+		return err
 	}
 
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
