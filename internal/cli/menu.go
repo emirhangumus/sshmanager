@@ -6,7 +6,6 @@ import (
 	"github.com/emirhangumus/sshmanager/internal/cli/commands"
 	"github.com/emirhangumus/sshmanager/internal/config"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
-	"github.com/manifoldco/promptui"
 )
 
 func ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath, version string) error {
@@ -21,12 +20,15 @@ func ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath, version
 		prompttext.DefaultPromptTexts.AddSSHConnection,
 		prompttext.DefaultPromptTexts.EditSSHConnection,
 		prompttext.DefaultPromptTexts.RemoveSSHConnection,
+		prompttext.DefaultPromptTexts.RenameSSHConnection,
 	}
 
 	for {
-		selector := promptui.Select{Label: "Menu Options | " + version, Items: options}
-		_, choice, err := selector.Run()
+		_, choice, err := prompttext.SelectPrompt("Menu Options | "+version, options)
 		if err != nil {
+			if prompttext.IsCancelError(err) {
+				return nil
+			}
 			fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.InvalidSelectionX+"\n", err)
 			continue
 		}
@@ -53,6 +55,10 @@ func ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath, version
 			}
 		case prompttext.DefaultPromptTexts.RemoveSSHConnection:
 			if err := commands.HandleRemove(connectionFilePath, secretKeyFilePath); err != nil {
+				fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.FailedToStoreUpdatedConnectionsX+"\n", err)
+			}
+		case prompttext.DefaultPromptTexts.RenameSSHConnection:
+			if err := commands.HandleRename(connectionFilePath, secretKeyFilePath); err != nil {
 				fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.FailedToStoreUpdatedConnectionsX+"\n", err)
 			}
 		}

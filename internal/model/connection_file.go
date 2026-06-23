@@ -3,6 +3,7 @@ package model
 import (
 	"crypto/rand"
 	"encoding/hex"
+	"errors"
 	"fmt"
 	"strings"
 	"time"
@@ -10,10 +11,12 @@ import (
 
 const CurrentConnectionFileVersion = "1.0"
 
+var ErrAliasAlreadyExists = errors.New("alias already exists")
+
 // ConnectionFile represents persisted SSH connections.
 type ConnectionFile struct {
-	Version     string          `yaml:"version"`
-	Connections []SSHConnection `yaml:"connections"`
+	Version     string          `yaml:"version" json:"version"`
+	Connections []SSHConnection `yaml:"connections" json:"connections"`
 }
 
 // ConnectionSelectItem is a typed menu item for prompt selection.
@@ -33,11 +36,17 @@ func NewConnectionFile() ConnectionFile {
 	}
 }
 
-func (c *ConnectionFile) AddConnection(conn SSHConnection) {
+func (c *ConnectionFile) AddConnection(conn SSHConnection) error {
+	conn.Alias = strings.TrimSpace(conn.Alias)
+	if c.hasAliasConflict(conn.Alias, "") {
+		return fmt.Errorf("%w: %s", ErrAliasAlreadyExists, conn.Alias)
+	}
+
 	if strings.TrimSpace(conn.ID) == "" || c.hasID(conn.ID) {
 		conn.ID = c.generateUniqueID()
 	}
 	c.Connections = append(c.Connections, conn)
+	return nil
 }
 
 func (c *ConnectionFile) RemoveConnectionByID(id string) bool {
@@ -60,30 +69,41 @@ func (c *ConnectionFile) GetConnectionByID(id string) *SSHConnection {
 }
 
 func (c *ConnectionFile) GetConnectionByAlias(alias string) *SSHConnection {
+	needle := normalizeAlias(alias)
+	if needle == "" {
+		return nil
+	}
+
 	for i := range c.Connections {
-		if c.Connections[i].Alias == alias {
+		if normalizeAlias(c.Connections[i].Alias) == needle {
 			return &c.Connections[i]
 		}
 	}
 	return nil
 }
 
-func (c *ConnectionFile) UpdateConnectionByID(id string, updated SSHConnection) bool {
+func (c *ConnectionFile) UpdateConnectionByID(id string, updated SSHConnection) (bool, error) {
 	for i := range c.Connections {
 		if c.Connections[i].ID == id {
+			updated.Alias = strings.TrimSpace(updated.Alias)
+			if c.hasAliasConflict(updated.Alias, id) {
+				return true, fmt.Errorf("%w: %s", ErrAliasAlreadyExists, updated.Alias)
+			}
+
 			updated.ID = id
 			c.Connections[i] = updated
-			return true
+			return true, nil
 		}
 	}
-	return false
+	return false, nil
 }
 
 func (c *ConnectionFile) AllAliases() []string {
 	aliases := make([]string, 0, len(c.Connections))
 	for _, conn := range c.Connections {
-		if strings.TrimSpace(conn.Alias) != "" {
-			aliases = append(aliases, conn.Alias)
+		alias := strings.TrimSpace(conn.Alias)
+		if alias != "" {
+			aliases = append(aliases, alias)
 		}
 	}
 	return aliases
@@ -99,6 +119,12 @@ func (c *ConnectionFile) SelectItems() []ConnectionSelectItem {
 		}
 		if strings.TrimSpace(conn.Alias) != "" {
 			display += fmt.Sprintf(" (%s)", conn.Alias)
+		}
+		if strings.TrimSpace(conn.Group) != "" {
+			display += fmt.Sprintf(" [group:%s]", strings.TrimSpace(conn.Group))
+		}
+		if tags := NormalizeTags(conn.Tags); len(tags) > 0 {
+			display += fmt.Sprintf(" [tags:%s]", strings.Join(tags, ","))
 		}
 		items = append(items, ConnectionSelectItem{
 			ConnectionID: conn.ID,
@@ -138,6 +164,25 @@ func (c *ConnectionFile) hasID(id string) bool {
 	return false
 }
 
+func (c *ConnectionFile) hasAliasConflict(alias, excludeID string) bool {
+	needle := normalizeAlias(alias)
+	if needle == "" {
+		return false
+	}
+
+	for i := range c.Connections {
+		conn := c.Connections[i]
+		if conn.ID == excludeID {
+			continue
+		}
+		if normalizeAlias(conn.Alias) == needle {
+			return true
+		}
+	}
+
+	return false
+}
+
 func (c *ConnectionFile) generateUniqueID() string {
 	for {
 		id := newConnectionID()
@@ -164,4 +209,8 @@ func newConnectionID() string {
 		return fmt.Sprintf("id-%d", time.Now().UnixNano())
 	}
 	return hex.EncodeToString(buf)
+}
+
+func normalizeAlias(alias string) string {
+	return strings.ToLower(strings.TrimSpace(alias))
 }

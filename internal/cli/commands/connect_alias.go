@@ -2,6 +2,7 @@ package commands
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/emirhangumus/sshmanager/internal/config"
 	"github.com/emirhangumus/sshmanager/internal/store"
@@ -9,6 +10,14 @@ import (
 )
 
 func FindAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, alias string) error {
+	return findAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, strings.TrimSpace(alias), "")
+}
+
+func FindAndConnectByID(connectionFilePath, secretKeyFilePath, configFilePath, id string) error {
+	return findAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, "", strings.TrimSpace(id))
+}
+
+func findAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, alias, id string) error {
 	cfg, err := config.LoadConfig(configFilePath)
 	if err != nil {
 		return err
@@ -24,9 +33,9 @@ func FindAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, alias
 		return nil
 	}
 
-	conn := connFile.GetConnectionByAlias(alias)
+	conn := findConnectionBySelector(&connFile, alias, id)
 	if conn == nil {
-		fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.AliasNotFoundX+"\n", alias)
+		fmt.Println(notFoundMessage(alias, id))
 		return nil
 	}
 

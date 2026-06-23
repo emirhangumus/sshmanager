@@ -45,7 +45,7 @@ func Install(shell string) (string, error) {
 	if err := os.MkdirAll(filepath.Dir(dst), 0o755); err != nil {
 		return "", fmt.Errorf("failed to create completion directory: %w", err)
 	}
-	if err := os.WriteFile(dst, []byte(script), 0o644); err != nil {
+	if err := os.WriteFile(dst, []byte(script), 0o600); err != nil {
 		return "", fmt.Errorf("failed to write completion file: %w", err)
 	}
 

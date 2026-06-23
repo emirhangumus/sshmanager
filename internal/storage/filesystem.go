@@ -53,17 +53,23 @@ func SecureDelete(path string) error {
 		}
 		return err
 	}
-	defer f.Close()
 
-	info, err := os.Stat(path)
-	if err == nil {
+	info, statErr := os.Stat(path)
+	if statErr == nil {
 		size := info.Size()
 		randomData := make([]byte, size)
 		if _, err := rand.Read(randomData); err == nil {
 			if _, err := f.Write(randomData); err != nil {
+				_ = f.Close()
 				return err
 			}
 		}
+	}
+
+	// The file handle must be closed before removal: Windows refuses to
+	// remove a file that still has an open handle.
+	if err := f.Close(); err != nil {
+		return err
 	}
 
 	if err := os.Remove(path); err != nil && !os.IsNotExist(err) {
@@ -89,8 +95,58 @@ func WriteYAMLFile(filePath string, data interface{}, fileMode os.FileMode) erro
 		return fmt.Errorf("failed to marshal data to YAML: %w", err)
 	}
 
-	if err := os.WriteFile(filePath, dataBytes, fileMode); err != nil {
+	if err := WriteFileAtomic(filePath, dataBytes, fileMode); err != nil {
 		return fmt.Errorf("failed to write file %s: %w", filePath, err)
 	}
+	return nil
+}
+
+// WriteFileAtomic writes data to filePath by using a temp file and atomic rename.
+func WriteFileAtomic(filePath string, data []byte, fileMode os.FileMode) error {
+	dir := filepath.Dir(filePath)
+	if err := os.MkdirAll(dir, 0o700); err != nil {
+		return fmt.Errorf("failed to create directory %s: %w", dir, err)
+	}
+
+	tmpFile, err := os.CreateTemp(dir, "."+filepath.Base(filePath)+".tmp-*")
+	if err != nil {
+		return fmt.Errorf("failed to create temporary file in %s: %w", dir, err)
+	}
+
+	tmpPath := tmpFile.Name()
+	shouldCleanup := true
+	defer func() {
+		if shouldCleanup {
+			_ = os.Remove(tmpPath)
+		}
+	}()
+
+	if err := tmpFile.Chmod(fileMode); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to set mode on temporary file %s: %w", tmpPath, err)
+	}
+	if _, err := tmpFile.Write(data); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to write temporary file %s: %w", tmpPath, err)
+	}
+	if err := tmpFile.Sync(); err != nil {
+		_ = tmpFile.Close()
+		return fmt.Errorf("failed to sync temporary file %s: %w", tmpPath, err)
+	}
+	if err := tmpFile.Close(); err != nil {
+		return fmt.Errorf("failed to close temporary file %s: %w", tmpPath, err)
+	}
+
+	if err := os.Rename(tmpPath, filePath); err != nil {
+		return fmt.Errorf("failed to atomically replace %s: %w", filePath, err)
+	}
+	shouldCleanup = false
+
+	// Best-effort directory sync for stronger durability guarantees.
+	if dirHandle, err := os.Open(dir); err == nil {
+		_ = dirHandle.Sync()
+		_ = dirHandle.Close()
+	}
+
 	return nil
 }

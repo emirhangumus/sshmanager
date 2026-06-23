@@ -2,18 +2,20 @@ package flags
 
 import (
 	"fmt"
+	"strings"
 
 	"github.com/emirhangumus/sshmanager/internal/storage"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
-	"github.com/manifoldco/promptui"
 )
 
 func CleanSSHFiles(connectionFilePath, secretKeyFilePath string) error {
-	p := promptui.Prompt{
-		Label: "Are you sure you want to remove all SSH connections and key files? This action cannot be undone. Type 'yes' to confirm.",
-	}
-	confirmation, err := p.Run()
-	if err != nil || confirmation != "yes" {
+	confirmation, err := prompttext.InputPrompt(
+		"Are you sure you want to remove all SSH connections and key files? This action cannot be undone. Type 'yes' to confirm.",
+		"",
+		false,
+		nil,
+	)
+	if err != nil || !strings.EqualFold(strings.TrimSpace(confirmation), "yes") {
 		fmt.Println(prompttext.DefaultPromptTexts.SuccessMessages.OperationCancelled)
 		return nil
 	}
