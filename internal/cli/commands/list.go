@@ -9,6 +9,7 @@ import (
 	"os"
 	"strconv"
 	"strings"
+	"text/tabwriter"
 
 	"github.com/emirhangumus/sshmanager/internal/model"
 	"github.com/emirhangumus/sshmanager/internal/store"
@@ -109,7 +110,8 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 		return nil
 	}
 
-	_, _ = fmt.Fprintln(out, "ALIAS\tUSERNAME\tHOST\tPORT\tAUTH_MODE\tGROUP\tTAGS\tDESCRIPTION")
+	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
+	_, _ = fmt.Fprintln(tw, "ALIAS\tUSERNAME\tHOST\tPORT\tAUTH_MODE\tGROUP\tTAGS\tDESCRIPTION")
 	for _, item := range items {
 		alias := item.Alias
 		if alias == "" {
@@ -119,7 +121,7 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 		if authMode == "" {
 			authMode = model.AuthModeAgent
 		}
-		_, _ = fmt.Fprintf(out, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n",
+		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n",
 			alias,
 			item.Username,
 			item.Host,
@@ -130,7 +132,7 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 			item.Description,
 		)
 	}
-	return nil
+	return tw.Flush()
 }
 
 func listFieldValue(item listOutputItem, field string) (string, error) {

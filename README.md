@@ -255,6 +255,14 @@ Files:
 - `secret.key` (either raw AES-256 key bytes or passphrase metadata, file mode `0600`)
 - `config.yaml` (configuration)
 
+### Migrating from older connection files
+
+Older versions of SSH Manager stored connections as a plain list without a
+stable `id` per entry. SSH Manager detects this legacy format automatically
+on load, assigns each connection a new `id`, and rewrites `conn` in the
+current schema on the next save — no manual migration step is required, and
+existing aliases/fields are preserved.
+
 ## Optional Master Passphrase
 
 You can enable passphrase-derived encryption keys by setting:

@@ -1,6 +1,7 @@
 package commands
 
 import (
+	"errors"
 	"flag"
 	"fmt"
 	"io"
@@ -101,7 +102,7 @@ func connect(conn *model.SSHConnection) error {
 	binPath, err := exec.LookPath(bin)
 	if err != nil {
 		if bin == "sshpass" {
-			return fmt.Errorf(prompttext.DefaultPromptTexts.ErrorMessages.SSHPassNotFound)
+			return errors.New(prompttext.DefaultPromptTexts.ErrorMessages.SSHPassNotFound)
 		}
 		return fmt.Errorf("required command %q not found in PATH", bin)
 	}
@@ -144,6 +145,13 @@ func buildConnectInvocation(conn *model.SSHConnection) (string, []string, []stri
 		identity := strings.TrimSpace(conn.IdentityFile)
 		if identity == "" {
 			return "", nil, nil, fmt.Errorf("identityFile is required when auth mode is %q", model.AuthModeKey)
+		}
+		info, err := os.Stat(identity)
+		if err != nil {
+			return "", nil, nil, fmt.Errorf("identityFile %q is not accessible: %w", identity, err)
+		}
+		if info.IsDir() {
+			return "", nil, nil, fmt.Errorf("identityFile %q is a directory, not a key file", identity)
 		}
 		sshArgs := []string{"-p", port, "-i", identity}
 		sshArgs = append(sshArgs, advancedArgs...)
@@ -197,6 +205,7 @@ func printCredentialsIfEnabled(conn *model.SSHConnection, cfg *config.SSHManager
 		return
 	}
 
+	fmt.Println("Warning: printing credentials to terminal (showCredentialsOnConnect=true)")
 	fmt.Printf("Username: %s\n", conn.Username)
 	fmt.Printf("Password: %s\n", conn.Password)
 }

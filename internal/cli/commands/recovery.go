@@ -8,6 +8,8 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"os/exec"
+	"path/filepath"
 	"strings"
 	"time"
 
@@ -289,7 +291,7 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 
 	report := doctorReport{
 		Healthy: true,
-		Checks:  make([]doctorCheck, 0, 12),
+		Checks:  make([]doctorCheck, 0, 15),
 	}
 
 	addCheck := func(name, status, detail string) {
@@ -337,6 +339,35 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 		addCheck("connection lock file", "ok", "no active lock file")
 	} else {
 		addCheck("connection lock file", "warn", fmt.Sprintf("failed to inspect lock file: %v", err))
+	}
+
+	if _, err := exec.LookPath("ssh"); err != nil {
+		addCheck("ssh binary", "error", "ssh not found in PATH; connections cannot be made")
+	} else {
+		addCheck("ssh binary", "ok", "ssh found in PATH")
+	}
+
+	if _, err := exec.LookPath("sshpass"); err != nil {
+		addCheck("sshpass binary", "warn", "sshpass not found in PATH; password-auth connections will fail")
+	} else {
+		addCheck("sshpass binary", "ok", "sshpass found in PATH")
+	}
+
+	if homeDir, err := os.UserHomeDir(); err != nil {
+		addCheck("known_hosts", "warn", fmt.Sprintf("could not determine home directory: %v", err))
+	} else {
+		knownHostsPath := filepath.Join(homeDir, ".ssh", "known_hosts")
+		info, statErr := os.Stat(knownHostsPath)
+		switch {
+		case statErr != nil && os.IsNotExist(statErr):
+			addCheck("known_hosts", "warn", "no ~/.ssh/known_hosts found; host key verification is delegated to ssh and has not yet trusted any host")
+		case statErr != nil:
+			addCheck("known_hosts", "warn", fmt.Sprintf("failed to inspect %s: %v", knownHostsPath, statErr))
+		case info.Size() == 0:
+			addCheck("known_hosts", "warn", fmt.Sprintf("%s is empty; host key verification is delegated to ssh and has not yet trusted any host", knownHostsPath))
+		default:
+			addCheck("known_hosts", "ok", fmt.Sprintf("host key verification is delegated to ssh via %s", knownHostsPath))
+		}
 	}
 
 	if keyData, err := os.ReadFile(secretKeyFilePath); err != nil {

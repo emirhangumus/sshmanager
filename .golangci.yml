@@ -7,3 +7,7 @@ linters:
     - ineffassign
     - staticcheck
     - unused
+    - errcheck
+    - gosec
+    - revive
+    - gofmt

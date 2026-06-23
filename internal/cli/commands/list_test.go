@@ -23,16 +23,50 @@ func TestHandleListTextOutput(t *testing.T) {
 		t.Fatalf("handleList failed: %v", err)
 	}
 
-	got := out.String()
-	if !strings.Contains(got, "ALIAS\tUSERNAME\tHOST\tPORT\tAUTH_MODE\tGROUP\tTAGS\tDESCRIPTION") {
-		t.Fatalf("missing header in output: %q", got)
+	lines := strings.Split(strings.TrimRight(out.String(), "\n"), "\n")
+	if len(lines) != 3 {
+		t.Fatalf("expected header + 2 rows, got %d lines: %q", len(lines), out.String())
 	}
-	if !strings.Contains(got, "prod\tubuntu\t1.2.3.4\t22\tpassword\tproduction\tlinux,api\tmain server") {
-		t.Fatalf("missing first row in output: %q", got)
+
+	headerFields := strings.Fields(lines[0])
+	wantHeader := []string{"ALIAS", "USERNAME", "HOST", "PORT", "AUTH_MODE", "GROUP", "TAGS", "DESCRIPTION"}
+	if !slicesEqual(headerFields, wantHeader) {
+		t.Fatalf("unexpected header: got %v, want %v", headerFields, wantHeader)
 	}
-	if !strings.Contains(got, "-\troot\tdb.internal\t22\tagent") {
-		t.Fatalf("missing second row in output: %q", got)
+
+	row1 := strings.Fields(lines[1])
+	wantRow1 := []string{"prod", "ubuntu", "1.2.3.4", "22", "password", "production", "linux,api", "main", "server"}
+	if !slicesEqual(row1, wantRow1) {
+		t.Fatalf("unexpected first row: got %v, want %v", row1, wantRow1)
 	}
+
+	row2 := strings.Fields(lines[2])
+	wantRow2 := []string{"-", "root", "db.internal", "22", "agent"}
+	if !slicesEqual(row2, wantRow2) {
+		t.Fatalf("unexpected second row: got %v, want %v", row2, wantRow2)
+	}
+
+	// Column boundaries must line up between the header and each data row.
+	aliasCol := strings.Index(lines[0], "ALIAS")
+	if strings.Index(lines[1], "prod") != aliasCol || strings.Index(lines[2], "-") != aliasCol {
+		t.Fatalf("columns are not aligned: %q", out.String())
+	}
+	usernameCol := strings.Index(lines[0], "USERNAME")
+	if strings.Index(lines[1], "ubuntu") != usernameCol || strings.Index(lines[2], "root") != usernameCol {
+		t.Fatalf("columns are not aligned: %q", out.String())
+	}
+}
+
+func slicesEqual(a, b []string) bool {
+	if len(a) != len(b) {
+		return false
+	}
+	for i := range a {
+		if a[i] != b[i] {
+			return false
+		}
+	}
+	return true
 }
 
 func TestHandleListJSONOutput(t *testing.T) {

@@ -1,10 +1,21 @@
 package commands
 
 import (
+	"os"
+	"path/filepath"
 	"testing"
 
 	"github.com/emirhangumus/sshmanager/internal/model"
 )
+
+func writeTestIdentityFile(t *testing.T) string {
+	t.Helper()
+	path := filepath.Join(t.TempDir(), "id_ed25519")
+	if err := os.WriteFile(path, []byte("test-key"), 0o600); err != nil {
+		t.Fatalf("failed to write test identity file: %v", err)
+	}
+	return path
+}
 
 func TestBuildConnectInvocationPasswordMode(t *testing.T) {
 	conn := &model.SSHConnection{
@@ -27,12 +38,13 @@ func TestBuildConnectInvocationPasswordMode(t *testing.T) {
 }
 
 func TestBuildConnectInvocationKeyMode(t *testing.T) {
+	identityFile := writeTestIdentityFile(t)
 	conn := &model.SSHConnection{
 		Username:     "ubuntu",
 		Host:         "example.com",
 		Port:         2222,
 		AuthMode:     model.AuthModeKey,
-		IdentityFile: "/tmp/id_ed25519",
+		IdentityFile: identityFile,
 	}
 
 	bin, args, env, err := buildConnectInvocation(conn)
@@ -42,7 +54,7 @@ func TestBuildConnectInvocationKeyMode(t *testing.T) {
 	if bin != "ssh" {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
-	wantArgs := []string{"-p", "2222", "-i", "/tmp/id_ed25519", "ubuntu@example.com"}
+	wantArgs := []string{"-p", "2222", "-i", identityFile, "ubuntu@example.com"}
 	assertStringSliceEqual(t, args, wantArgs)
 	if len(env) != 0 {
 		t.Fatalf("expected no extra env for key mode, got %v", env)
@@ -50,11 +62,12 @@ func TestBuildConnectInvocationKeyMode(t *testing.T) {
 }
 
 func TestBuildConnectInvocationWithAdvancedOptions(t *testing.T) {
+	identityFile := writeTestIdentityFile(t)
 	conn := &model.SSHConnection{
 		Username:       "ubuntu",
 		Host:           "example.com",
 		AuthMode:       model.AuthModeKey,
-		IdentityFile:   "/tmp/id_ed25519",
+		IdentityFile:   identityFile,
 		ProxyJump:      "jump.internal:2222",
 		LocalForwards:  []string{"8080:127.0.0.1:80"},
 		RemoteForwards: []string{"9000:127.0.0.1:9000"},
@@ -70,7 +83,7 @@ func TestBuildConnectInvocationWithAdvancedOptions(t *testing.T) {
 	}
 	wantArgs := []string{
 		"-p", "22",
-		"-i", "/tmp/id_ed25519",
+		"-i", identityFile,
 		"-J", "jump.internal:2222",
 		"-L", "8080:127.0.0.1:80",
 		"-R", "9000:127.0.0.1:9000",
@@ -132,6 +145,32 @@ func TestBuildConnectInvocationRejectsMissingIdentityForKeyMode(t *testing.T) {
 
 	if _, _, _, err := buildConnectInvocation(conn); err == nil {
 		t.Fatal("expected error for missing identity file in key mode, got nil")
+	}
+}
+
+func TestBuildConnectInvocationRejectsNonexistentIdentityFile(t *testing.T) {
+	conn := &model.SSHConnection{
+		Username:     "ubuntu",
+		Host:         "example.com",
+		AuthMode:     model.AuthModeKey,
+		IdentityFile: filepath.Join(t.TempDir(), "does-not-exist"),
+	}
+
+	if _, _, _, err := buildConnectInvocation(conn); err == nil {
+		t.Fatal("expected error for nonexistent identity file, got nil")
+	}
+}
+
+func TestBuildConnectInvocationRejectsDirectoryIdentityFile(t *testing.T) {
+	conn := &model.SSHConnection{
+		Username:     "ubuntu",
+		Host:         "example.com",
+		AuthMode:     model.AuthModeKey,
+		IdentityFile: t.TempDir(),
+	}
+
+	if _, _, _, err := buildConnectInvocation(conn); err == nil {
+		t.Fatal("expected error for directory identity file, got nil")
 	}
 }
 

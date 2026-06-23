@@ -21,9 +21,9 @@ const (
 )
 
 const (
-	passphraseEnvVar       = "SSHMANAGER_MASTER_PASSPHRASE"
+	passphraseEnvVar       = "SSHMANAGER_MASTER_PASSPHRASE" //nolint:gosec // env var name, not a credential value
 	passphraseKeyFileMode  = "passphrase"
-	passphraseKeyFileKDF   = "pbkdf2-sha256"
+	passphraseKeyFileKDF   = "pbkdf2-sha256" //nolint:gosec // KDF identifier string, not a credential value
 	passphraseKeyFileV1    = 1
 	passphraseIterationsV1 = 600_000
 )
