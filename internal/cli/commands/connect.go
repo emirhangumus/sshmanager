@@ -107,13 +107,46 @@ func connect(conn *model.SSHConnection) error {
 		return fmt.Errorf("required command %q not found in PATH", bin)
 	}
 
+	if bin == "sshpass" {
+		if err := ensureHostKeyAccepted(strings.TrimSpace(conn.Host), conn.EffectivePort()); err != nil {
+			return err
+		}
+	}
+
 	cmd := exec.Command(binPath, args...)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
 	cmd.Env = append(os.Environ(), envAdd...)
 
-	return cmd.Run()
+	err = cmd.Run()
+	if bin == "sshpass" {
+		err = translateSSHPassError(err, conn.Host)
+	}
+	return err
+}
+
+// translateSSHPassError rewrites sshpass's bare exit codes into an
+// actionable message. sshpass never shows the interactive
+// "authenticity of host ... can't be established" prompt that plain ssh
+// would print to the terminal: for a password-auth connection it has
+// already taken over stdin/stdout to feed the password, so on an unknown or
+// changed host key it just refuses and exits 6/7 with little to nothing on
+// stderr, leaving the user with an opaque "exit status 6".
+func translateSSHPassError(err error, host string) error {
+	var exitErr *exec.ExitError
+	if err == nil || !errors.As(err, &exitErr) {
+		return err
+	}
+
+	switch exitErr.ExitCode() {
+	case 6:
+		return fmt.Errorf("host key for %q is not yet trusted, and sshpass cannot show the interactive fingerprint prompt for a password-auth connection; run %q once by hand to verify and accept the fingerprint, then retry", host, "ssh "+host)
+	case 7:
+		return fmt.Errorf("host key for %q has changed since it was last trusted (sshpass refuses to continue automatically) — this can indicate a man-in-the-middle attack; verify the new fingerprint out-of-band before updating known_hosts", host)
+	default:
+		return err
+	}
 }
 
 func buildConnectInvocation(conn *model.SSHConnection) (string, []string, []string, error) {
