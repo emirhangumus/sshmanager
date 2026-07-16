@@ -3,6 +3,7 @@ package commands
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 
 	"github.com/emirhangumus/sshmanager/internal/model"
@@ -215,6 +216,107 @@ func TestBuildConnectInvocationRejectsInvalidAdvancedOptions(t *testing.T) {
 				t.Fatal("expected validation error, got nil")
 			}
 		})
+	}
+}
+
+func TestBuildConnectInvocationProxyJumpPassword(t *testing.T) {
+	conn := &model.SSHConnection{
+		Username:          "ubuntu",
+		Host:              "internal.example.com",
+		AuthMode:          model.AuthModePassword,
+		Password:          "target-secret",
+		ProxyJump:         "jumpuser@bastion.example.com:2222",
+		ProxyJumpAuthMode: model.AuthModePassword,
+		ProxyJumpPassword: "jump-secret",
+	}
+
+	bin, args, env, err := buildConnectInvocation(conn)
+	if err != nil {
+		t.Fatalf("buildConnectInvocation failed: %v", err)
+	}
+	if bin != "sshpass" {
+		t.Fatalf("unexpected binary: %q", bin)
+	}
+
+	wantProxyCommand := `SSHPASS="$SSHMANAGER_PROXY_JUMP_SSHPASS" sshpass -e ssh -p '2222' -W %h:%p 'jumpuser@bastion.example.com'`
+	wantArgs := []string{
+		"-e", "ssh", "-p", "22",
+		"-o", "ProxyCommand=" + wantProxyCommand,
+		"ubuntu@internal.example.com",
+	}
+	assertStringSliceEqual(t, args, wantArgs)
+	assertStringSliceEqual(t, env, []string{
+		"SSHPASS=target-secret",
+		"SSHMANAGER_PROXY_JUMP_SSHPASS=jump-secret",
+	})
+
+	// Regression guard: the jump password must never appear in argv, only
+	// referenced by env var name, since argv is visible via `ps`.
+	for _, arg := range args {
+		if strings.Contains(arg, "jump-secret") {
+			t.Fatalf("jump password leaked into argv: %q", arg)
+		}
+	}
+}
+
+func TestBuildConnectInvocationProxyJumpIdentityFileOnly(t *testing.T) {
+	targetIdentity := writeTestIdentityFile(t)
+	jumpIdentity := writeTestIdentityFile(t)
+	conn := &model.SSHConnection{
+		Username:              "ubuntu",
+		Host:                  "internal.example.com",
+		AuthMode:              model.AuthModeKey,
+		IdentityFile:          targetIdentity,
+		ProxyJump:             "jumpuser@bastion.example.com",
+		ProxyJumpIdentityFile: jumpIdentity,
+	}
+
+	bin, args, env, err := buildConnectInvocation(conn)
+	if err != nil {
+		t.Fatalf("buildConnectInvocation failed: %v", err)
+	}
+	if bin != "ssh" {
+		t.Fatalf("unexpected binary: %q", bin)
+	}
+	if len(env) != 0 {
+		t.Fatalf("expected no env for identity-only proxy jump, got %v", env)
+	}
+
+	wantProxyCommand := "ssh -i '" + jumpIdentity + "' -W %h:%p 'jumpuser@bastion.example.com'"
+	wantArgs := []string{
+		"-p", "22", "-i", targetIdentity,
+		"-o", "ProxyCommand=" + wantProxyCommand,
+		"ubuntu@internal.example.com",
+	}
+	assertStringSliceEqual(t, args, wantArgs)
+}
+
+func TestBuildConnectInvocationRejectsMultiHopProxyJumpPassword(t *testing.T) {
+	conn := &model.SSHConnection{
+		Username:          "ubuntu",
+		Host:              "internal.example.com",
+		AuthMode:          model.AuthModeAgent,
+		ProxyJump:         "jump1,jump2",
+		ProxyJumpAuthMode: model.AuthModePassword,
+		ProxyJumpPassword: "jump-secret",
+	}
+
+	if _, _, _, err := buildConnectInvocation(conn); err == nil {
+		t.Fatal("expected error for multi-hop proxy jump with dedicated password, got nil")
+	}
+}
+
+func TestBuildConnectInvocationRejectsMissingProxyJumpPassword(t *testing.T) {
+	conn := &model.SSHConnection{
+		Username:          "ubuntu",
+		Host:              "internal.example.com",
+		AuthMode:          model.AuthModeAgent,
+		ProxyJump:         "bastion.example.com",
+		ProxyJumpAuthMode: model.AuthModePassword,
+	}
+
+	if _, _, _, err := buildConnectInvocation(conn); err == nil {
+		t.Fatal("expected error for missing proxy jump password, got nil")
 	}
 }
 

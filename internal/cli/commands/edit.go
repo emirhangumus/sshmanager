@@ -91,6 +91,11 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 	newPassword := fs.String("new-password", "", "New password")
 	newIdentityFile := fs.String("new-identity-file", "", "New identity file path")
 	newProxyJump := fs.String("new-proxy-jump", "", "New ProxyJump spec")
+	newProxyJumpAuthMode := fs.String("new-proxy-jump-auth-mode", "", "New ProxyJump auth mode: password|key|agent")
+	newProxyJumpPassword := fs.String("new-proxy-jump-password", "", "New ProxyJump password")
+	newProxyJumpIdentityFile := fs.String("new-proxy-jump-identity-file", "", "New ProxyJump identity file path")
+	clearProxyJumpPassword := fs.Bool("clear-proxy-jump-password", false, "Clear proxy jump password")
+	clearProxyJumpIdentityFile := fs.Bool("clear-proxy-jump-identity-file", false, "Clear proxy jump identity file")
 	newGroup := fs.String("new-group", "", "New connection group")
 	newAlias := fs.String("new-alias", "", "New alias")
 	newDescription := fs.String("new-description", "", "New description")
@@ -131,6 +136,12 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 	if *clearProxyJump && strings.TrimSpace(*newProxyJump) != "" {
 		return fmt.Errorf("edit: use either --new-proxy-jump or --clear-proxy-jump, not both")
 	}
+	if *clearProxyJumpPassword && strings.TrimSpace(*newProxyJumpPassword) != "" {
+		return fmt.Errorf("edit: use either --new-proxy-jump-password or --clear-proxy-jump-password, not both")
+	}
+	if *clearProxyJumpIdentityFile && strings.TrimSpace(*newProxyJumpIdentityFile) != "" {
+		return fmt.Errorf("edit: use either --new-proxy-jump-identity-file or --clear-proxy-jump-identity-file, not both")
+	}
 	if *clearGroup && strings.TrimSpace(*newGroup) != "" {
 		return fmt.Errorf("edit: use either --new-group or --clear-group, not both")
 	}
@@ -154,6 +165,11 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 		strings.TrimSpace(*newPassword) != "" ||
 		strings.TrimSpace(*newIdentityFile) != "" ||
 		strings.TrimSpace(*newProxyJump) != "" ||
+		strings.TrimSpace(*newProxyJumpAuthMode) != "" ||
+		strings.TrimSpace(*newProxyJumpPassword) != "" ||
+		strings.TrimSpace(*newProxyJumpIdentityFile) != "" ||
+		*clearProxyJumpPassword ||
+		*clearProxyJumpIdentityFile ||
 		strings.TrimSpace(*newGroup) != "" ||
 		len(newLocalForwards) > 0 ||
 		len(newRemoteForwards) > 0 ||
@@ -212,6 +228,19 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 		updated.ProxyJump = ""
 	} else if v := strings.TrimSpace(*newProxyJump); v != "" {
 		updated.ProxyJump = v
+	}
+	if v := strings.TrimSpace(*newProxyJumpAuthMode); v != "" {
+		updated.ProxyJumpAuthMode = v
+	}
+	if *clearProxyJumpPassword {
+		updated.ProxyJumpPassword = ""
+	} else if v := strings.TrimSpace(*newProxyJumpPassword); v != "" {
+		updated.ProxyJumpPassword = v
+	}
+	if *clearProxyJumpIdentityFile {
+		updated.ProxyJumpIdentityFile = ""
+	} else if v := strings.TrimSpace(*newProxyJumpIdentityFile); v != "" {
+		updated.ProxyJumpIdentityFile = v
 	}
 	if *clearGroup {
 		updated.Group = ""

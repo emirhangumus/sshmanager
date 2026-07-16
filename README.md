@@ -84,7 +84,16 @@ sshmanager add --host app.internal --username ubuntu --auth-mode agent --alias p
 sshmanager add --host db.internal --username root --auth-mode key --identity-file ~/.ssh/id_ed25519 --alias db
 sshmanager add --host app.internal --username ubuntu --auth-mode agent --group production --tag linux --tag api --alias prod
 sshmanager add --host app.internal --username ubuntu --auth-mode key --identity-file ~/.ssh/id_ed25519 --proxy-jump bastion.internal:2222 --local-forward 8080:127.0.0.1:80 --remote-forward 9000:127.0.0.1:9000 --extra-ssh-arg -vv --extra-ssh-arg -o --extra-ssh-arg ServerAliveInterval=30
+sshmanager add --host internal.example.com --username targetuser --auth-mode password --password TARGET_PASSWORD --proxy-jump jumpuser@bastion.example.com --proxy-jump-auth-mode password --proxy-jump-password JUMP_PASSWORD --alias internal-server
 ```
+
+When the jump host and the target host need different credentials (e.g. both
+require password auth), set `--proxy-jump-auth-mode`/`--proxy-jump-password`/
+`--proxy-jump-identity-file` independently of the target host's own auth
+fields. If left unset, ProxyJump behaves as before (passed through natively
+to `ssh -J`, relying on the system's own key/agent/ssh_config for the hop).
+A dedicated jump password or identity file is only supported for a single
+ProxyJump hop.
 
 - Edit a connection non-interactively:
 

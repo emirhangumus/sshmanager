@@ -91,6 +91,13 @@ func validateProxyJump(input string) error {
 	return model.ValidateProxyJump(strings.TrimSpace(input))
 }
 
+func validateOptionalAuthMode(input string) error {
+	if strings.TrimSpace(input) == "" {
+		return nil
+	}
+	return validateAuthMode(input)
+}
+
 func validateForwardList(input string) error {
 	return model.ValidateForwardSpecs(parseCommaSeparatedValues(input))
 }
@@ -144,6 +151,11 @@ func AddSSHConnectionPrompt() (model.SSHConnection, error) {
 		return model.SSHConnection{}, err
 	}
 
+	proxyJumpAuthMode, proxyJumpPassword, proxyJumpIdentityFile, err := promptProxyJumpAuthFields(proxyJump, "", "", "", false)
+	if err != nil {
+		return model.SSHConnection{}, err
+	}
+
 	localForwardsRaw, err := runForwardListPrompt(DefaultPromptTexts.EnterLocalForwards, "")
 	if err != nil {
 		return model.SSHConnection{}, err
@@ -180,20 +192,23 @@ func AddSSHConnectionPrompt() (model.SSHConnection, error) {
 	}
 
 	conn := normalizeConnection(model.SSHConnection{
-		Username:       username,
-		Host:           host,
-		Port:           parsePort(portRaw),
-		AuthMode:       authMode,
-		Password:       password,
-		IdentityFile:   identityFile,
-		ProxyJump:      proxyJump,
-		LocalForwards:  parseCommaSeparatedValues(localForwardsRaw),
-		RemoteForwards: parseCommaSeparatedValues(remoteForwardsRaw),
-		ExtraSSHArgs:   parseCommaSeparatedValues(extraSSHArgsRaw),
-		Group:          group,
-		Tags:           parseCommaSeparatedValues(tagsRaw),
-		Description:    description,
-		Alias:          alias,
+		Username:              username,
+		Host:                  host,
+		Port:                  parsePort(portRaw),
+		AuthMode:              authMode,
+		Password:              password,
+		IdentityFile:          identityFile,
+		ProxyJump:             proxyJump,
+		ProxyJumpAuthMode:     proxyJumpAuthMode,
+		ProxyJumpPassword:     proxyJumpPassword,
+		ProxyJumpIdentityFile: proxyJumpIdentityFile,
+		LocalForwards:         parseCommaSeparatedValues(localForwardsRaw),
+		RemoteForwards:        parseCommaSeparatedValues(remoteForwardsRaw),
+		ExtraSSHArgs:          parseCommaSeparatedValues(extraSSHArgsRaw),
+		Group:                 group,
+		Tags:                  parseCommaSeparatedValues(tagsRaw),
+		Description:           description,
+		Alias:                 alias,
 	})
 	conn = normalizeAuthSensitiveFields(conn)
 	return conn, nil
@@ -240,6 +255,11 @@ func EditSSHConnectionPrompt(conn *model.SSHConnection) (model.SSHConnection, er
 		return model.SSHConnection{}, err
 	}
 
+	proxyJumpAuthMode, proxyJumpPassword, proxyJumpIdentityFile, err := promptProxyJumpAuthFields(proxyJump, conn.ProxyJumpAuthMode, conn.ProxyJumpPassword, conn.ProxyJumpIdentityFile, true)
+	if err != nil {
+		return model.SSHConnection{}, err
+	}
+
 	localForwardsRaw, err := runForwardListPrompt(DefaultPromptTexts.EditLocalForwards, joinListForPrompt(conn.LocalForwards))
 	if err != nil {
 		return model.SSHConnection{}, err
@@ -276,21 +296,24 @@ func EditSSHConnectionPrompt(conn *model.SSHConnection) (model.SSHConnection, er
 	}
 
 	updated := normalizeConnection(model.SSHConnection{
-		ID:             conn.ID,
-		Username:       username,
-		Host:           host,
-		Port:           parsePort(portRaw),
-		AuthMode:       authMode,
-		Password:       password,
-		IdentityFile:   identityFile,
-		ProxyJump:      proxyJump,
-		LocalForwards:  parseCommaSeparatedValues(localForwardsRaw),
-		RemoteForwards: parseCommaSeparatedValues(remoteForwardsRaw),
-		ExtraSSHArgs:   parseCommaSeparatedValues(extraSSHArgsRaw),
-		Group:          group,
-		Tags:           parseCommaSeparatedValues(tagsRaw),
-		Description:    description,
-		Alias:          alias,
+		ID:                    conn.ID,
+		Username:              username,
+		Host:                  host,
+		Port:                  parsePort(portRaw),
+		AuthMode:              authMode,
+		Password:              password,
+		IdentityFile:          identityFile,
+		ProxyJump:             proxyJump,
+		ProxyJumpAuthMode:     proxyJumpAuthMode,
+		ProxyJumpPassword:     proxyJumpPassword,
+		ProxyJumpIdentityFile: proxyJumpIdentityFile,
+		LocalForwards:         parseCommaSeparatedValues(localForwardsRaw),
+		RemoteForwards:        parseCommaSeparatedValues(remoteForwardsRaw),
+		ExtraSSHArgs:          parseCommaSeparatedValues(extraSSHArgsRaw),
+		Group:                 group,
+		Tags:                  parseCommaSeparatedValues(tagsRaw),
+		Description:           description,
+		Alias:                 alias,
 	})
 	updated = normalizeAuthSensitiveFields(updated)
 	return updated, nil
@@ -340,6 +363,22 @@ func runProxyJumpPrompt(label, defaultValue string) (string, error) {
 	return InputPrompt(label, defaultValue, false, validateProxyJump)
 }
 
+func runProxyJumpAuthModePrompt(label, defaultValue string) (string, error) {
+	return InputPrompt(label, defaultValue, false, validateOptionalAuthMode)
+}
+
+func runProxyJumpPasswordPrompt(label, defaultValue string, required bool) (string, error) {
+	var validator func(string) error
+	if required {
+		validator = validateText
+	}
+	return InputPrompt(label, defaultValue, true, validator)
+}
+
+func runProxyJumpIdentityFilePrompt(label, defaultValue string) (string, error) {
+	return InputPrompt(label, defaultValue, false, nil)
+}
+
 func runForwardListPrompt(label, defaultValue string) (string, error) {
 	return InputPrompt(label, defaultValue, false, validateForwardList)
 }
@@ -356,12 +395,51 @@ func runTagsPrompt(label, defaultValue string) (string, error) {
 	return InputPrompt(label, defaultValue, false, validateTags)
 }
 
+// promptProxyJumpAuthFields prompts for ProxyJump-specific auth mode,
+// password and identity file only when a ProxyJump is set — an empty
+// ProxyJump means these fields are irrelevant and left blank.
+func promptProxyJumpAuthFields(proxyJump, defaultAuthMode, defaultPassword, defaultIdentityFile string, editing bool) (authMode, password, identityFile string, err error) {
+	if strings.TrimSpace(proxyJump) == "" {
+		return "", "", "", nil
+	}
+
+	authModeLabel, passwordLabel, identityFileLabel := DefaultPromptTexts.EnterProxyJumpAuthMode, DefaultPromptTexts.EnterProxyJumpPassword, DefaultPromptTexts.EnterProxyJumpIdentityFile
+	if editing {
+		authModeLabel, passwordLabel, identityFileLabel = DefaultPromptTexts.EditProxyJumpAuthMode, DefaultPromptTexts.EditProxyJumpPassword, DefaultPromptTexts.EditProxyJumpIdentityFile
+	}
+
+	authModeRaw, err := runProxyJumpAuthModePrompt(authModeLabel, defaultAuthMode)
+	if err != nil {
+		return "", "", "", err
+	}
+	authMode = model.NormalizeAuthMode(authModeRaw)
+
+	password, err = runProxyJumpPasswordPrompt(passwordLabel, defaultPassword, authMode == model.AuthModePassword)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	identityFile, err = runProxyJumpIdentityFilePrompt(identityFileLabel, defaultIdentityFile)
+	if err != nil {
+		return "", "", "", err
+	}
+
+	return authMode, password, strings.TrimSpace(identityFile), nil
+}
+
 func normalizeConnection(conn model.SSHConnection) model.SSHConnection {
 	conn.Username = strings.TrimSpace(conn.Username)
 	conn.Host = strings.TrimSpace(conn.Host)
 	conn.AuthMode = model.NormalizeAuthMode(conn.AuthMode)
 	conn.IdentityFile = strings.TrimSpace(conn.IdentityFile)
 	conn.ProxyJump = strings.TrimSpace(conn.ProxyJump)
+	conn.ProxyJumpAuthMode = model.NormalizeAuthMode(conn.ProxyJumpAuthMode)
+	conn.ProxyJumpIdentityFile = strings.TrimSpace(conn.ProxyJumpIdentityFile)
+	if conn.ProxyJump == "" {
+		conn.ProxyJumpAuthMode = ""
+		conn.ProxyJumpPassword = ""
+		conn.ProxyJumpIdentityFile = ""
+	}
 	conn.LocalForwards = model.NormalizeStringList(conn.LocalForwards)
 	conn.RemoteForwards = model.NormalizeStringList(conn.RemoteForwards)
 	conn.ExtraSSHArgs = model.NormalizeStringList(conn.ExtraSSHArgs)
@@ -381,6 +459,18 @@ func normalizeAuthSensitiveFields(conn model.SSHConnection) model.SSHConnection 
 	case model.AuthModeAgent:
 		conn.Password = ""
 		conn.IdentityFile = ""
+	}
+
+	if conn.ProxyJump != "" {
+		switch conn.EffectiveProxyJumpAuthMode() {
+		case model.AuthModePassword:
+			conn.ProxyJumpIdentityFile = ""
+		case model.AuthModeKey:
+			conn.ProxyJumpPassword = ""
+		case model.AuthModeAgent:
+			conn.ProxyJumpPassword = ""
+			conn.ProxyJumpIdentityFile = ""
+		}
 	}
 	return conn
 }

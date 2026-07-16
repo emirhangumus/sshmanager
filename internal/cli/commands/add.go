@@ -52,6 +52,9 @@ func handleAddArgs(connectionFilePath, secretKeyFilePath string, args []string, 
 	password := fs.String("password", "", "SSH password (password mode)")
 	identityFile := fs.String("identity-file", "", "Identity file path (key mode)")
 	proxyJump := fs.String("proxy-jump", "", "ProxyJump spec ([user@]host[:port][,[user@]host[:port]...])")
+	proxyJumpAuthMode := fs.String("proxy-jump-auth-mode", "", "ProxyJump auth mode: password|key|agent (defaults to key/agent, independent of target auth)")
+	proxyJumpPassword := fs.String("proxy-jump-password", "", "ProxyJump password (required if proxy-jump-auth-mode is password)")
+	proxyJumpIdentityFile := fs.String("proxy-jump-identity-file", "", "ProxyJump identity file path")
 	group := fs.String("group", "", "Connection group name")
 	alias := fs.String("alias", "", "Connection alias")
 	description := fs.String("description", "", "Connection description")
@@ -72,20 +75,23 @@ func handleAddArgs(connectionFilePath, secretKeyFilePath string, args []string, 
 	}
 
 	conn := model.SSHConnection{
-		Host:           strings.TrimSpace(*host),
-		Username:       strings.TrimSpace(*username),
-		Port:           *port,
-		AuthMode:       strings.TrimSpace(*authMode),
-		Password:       *password,
-		IdentityFile:   strings.TrimSpace(*identityFile),
-		ProxyJump:      strings.TrimSpace(*proxyJump),
-		LocalForwards:  localForwards.Values(),
-		RemoteForwards: remoteForwards.Values(),
-		ExtraSSHArgs:   extraSSHArgs.Values(),
-		Group:          strings.TrimSpace(*group),
-		Tags:           tags.Values(),
-		Alias:          strings.TrimSpace(*alias),
-		Description:    strings.TrimSpace(*description),
+		Host:                  strings.TrimSpace(*host),
+		Username:              strings.TrimSpace(*username),
+		Port:                  *port,
+		AuthMode:              strings.TrimSpace(*authMode),
+		Password:              *password,
+		IdentityFile:          strings.TrimSpace(*identityFile),
+		ProxyJump:             strings.TrimSpace(*proxyJump),
+		ProxyJumpAuthMode:     strings.TrimSpace(*proxyJumpAuthMode),
+		ProxyJumpPassword:     *proxyJumpPassword,
+		ProxyJumpIdentityFile: strings.TrimSpace(*proxyJumpIdentityFile),
+		LocalForwards:         localForwards.Values(),
+		RemoteForwards:        remoteForwards.Values(),
+		ExtraSSHArgs:          extraSSHArgs.Values(),
+		Group:                 strings.TrimSpace(*group),
+		Tags:                  tags.Values(),
+		Alias:                 strings.TrimSpace(*alias),
+		Description:           strings.TrimSpace(*description),
 	}
 
 	normalized, err := normalizeImportedConnection(conn)
