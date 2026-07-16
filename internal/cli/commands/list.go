@@ -23,6 +23,7 @@ type listOutputItem struct {
 	Host           string   `json:"host"`
 	Port           int      `json:"port"`
 	AuthMode       string   `json:"authMode"`
+	Password       string   `json:"password,omitempty"`
 	IdentityFile   string   `json:"identityFile,omitempty"`
 	ProxyJump      string   `json:"proxyJump,omitempty"`
 	LocalForwards  []string `json:"localForwards,omitempty"`
@@ -38,11 +39,15 @@ func HandleList(connectionFilePath, secretKeyFilePath string, args []string) err
 }
 
 func handleList(connectionFilePath, secretKeyFilePath string, args []string, out io.Writer) error {
+	args = expandCombinedShortFlags(args, "py")
+
 	fs := flag.NewFlagSet("list", flag.ContinueOnError)
 	fs.SetOutput(io.Discard)
 	jsonOutput := fs.Bool("json", false, "Output JSON")
-	field := fs.String("field", "", "Output only one field per line (id|alias|username|host|port|auth-mode|identity-file|proxy-jump|local-forwards|remote-forwards|extra-ssh-args|group|tags|description|target)")
+	field := fs.String("field", "", "Output only one field per line (id|alias|username|host|port|auth-mode|password|identity-file|proxy-jump|local-forwards|remote-forwards|extra-ssh-args|group|tags|description|target)")
 	groupFilter := fs.String("group", "", "Filter by group")
+	showPasswords := fs.Bool("p", false, "Show saved passwords too (requires confirmation unless -y is set)")
+	autoYes := fs.Bool("y", false, "Auto-confirm the password reveal prompt")
 	var tagFilters stringListFlag
 	fs.Var(&tagFilters, "tag", "Filter by tag (repeatable)")
 
@@ -54,6 +59,17 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 	}
 	if *jsonOutput && strings.TrimSpace(*field) != "" {
 		return errors.New("--json and --field cannot be used together")
+	}
+
+	if *showPasswords && !*autoYes {
+		confirmed, err := confirmShowPasswords()
+		if err != nil {
+			return err
+		}
+		if !confirmed {
+			_, _ = fmt.Fprintln(out, prompttext.DefaultPromptTexts.SuccessMessages.OperationCancelled)
+			return nil
+		}
 	}
 
 	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath)
@@ -71,7 +87,7 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 		if !matchesListFilters(conn, *groupFilter, tagFilters.Values()) {
 			continue
 		}
-		items = append(items, listOutputItem{
+		item := listOutputItem{
 			ID:             conn.ID,
 			Alias:          strings.TrimSpace(conn.Alias),
 			Username:       conn.Username,
@@ -86,7 +102,11 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 			Group:          strings.TrimSpace(conn.Group),
 			Tags:           model.NormalizeTags(conn.Tags),
 			Description:    conn.Description,
-		})
+		}
+		if *showPasswords {
+			item.Password = conn.Password
+		}
+		items = append(items, item)
 	}
 	if len(items) == 0 {
 		_, _ = fmt.Fprintln(out, prompttext.DefaultPromptTexts.ErrorMessages.NoSSHConnectionsFound)
@@ -111,7 +131,11 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 	}
 
 	tw := tabwriter.NewWriter(out, 0, 0, 2, ' ', 0)
-	_, _ = fmt.Fprintln(tw, "ALIAS\tUSERNAME\tHOST\tPORT\tAUTH_MODE\tGROUP\tTAGS\tDESCRIPTION")
+	if *showPasswords {
+		_, _ = fmt.Fprintln(tw, "ALIAS\tUSERNAME\tHOST\tPORT\tAUTH_MODE\tPASSWORD\tGROUP\tTAGS\tDESCRIPTION")
+	} else {
+		_, _ = fmt.Fprintln(tw, "ALIAS\tUSERNAME\tHOST\tPORT\tAUTH_MODE\tGROUP\tTAGS\tDESCRIPTION")
+	}
 	for _, item := range items {
 		alias := item.Alias
 		if alias == "" {
@@ -120,6 +144,24 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 		authMode := item.AuthMode
 		if authMode == "" {
 			authMode = model.AuthModeAgent
+		}
+		if *showPasswords {
+			password := item.Password
+			if password == "" {
+				password = "-"
+			}
+			_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\t%s\n",
+				alias,
+				item.Username,
+				item.Host,
+				item.Port,
+				authMode,
+				password,
+				item.Group,
+				strings.Join(item.Tags, ","),
+				item.Description,
+			)
+			continue
 		}
 		_, _ = fmt.Fprintf(tw, "%s\t%s\t%s\t%d\t%s\t%s\t%s\t%s\n",
 			alias,
@@ -133,6 +175,51 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 		)
 	}
 	return tw.Flush()
+}
+
+func confirmShowPasswords() (bool, error) {
+	value, err := prompttext.InputPrompt(
+		"Show saved passwords in plaintext? Type 'yes' to continue",
+		"",
+		false,
+		nil,
+	)
+	if err != nil {
+		if prompttext.IsCancelError(err) {
+			return false, nil
+		}
+		return false, err
+	}
+	return strings.EqualFold(strings.TrimSpace(value), "yes"), nil
+}
+
+// expandCombinedShortFlags rewrites getopt-style combined short flags (e.g.
+// "-py") into their individual flags (e.g. "-p", "-y") so the stdlib flag
+// package, which has no notion of combined short flags, can parse them.
+func expandCombinedShortFlags(args []string, letters string) []string {
+	expanded := make([]string, 0, len(args))
+	for _, arg := range args {
+		if !isCombinedShortFlag(arg, letters) {
+			expanded = append(expanded, arg)
+			continue
+		}
+		for _, ch := range arg[1:] {
+			expanded = append(expanded, "-"+string(ch))
+		}
+	}
+	return expanded
+}
+
+func isCombinedShortFlag(arg, letters string) bool {
+	if len(arg) < 3 || arg[0] != '-' || arg[1] == '-' {
+		return false
+	}
+	for _, ch := range arg[1:] {
+		if !strings.ContainsRune(letters, ch) {
+			return false
+		}
+	}
+	return true
 }
 
 func listFieldValue(item listOutputItem, field string) (string, error) {
@@ -149,6 +236,8 @@ func listFieldValue(item listOutputItem, field string) (string, error) {
 		return strconv.Itoa(item.Port), nil
 	case "auth-mode", "auth_mode", "authmode":
 		return item.AuthMode, nil
+	case "password":
+		return item.Password, nil
 	case "identity-file", "identity_file", "identityfile":
 		return item.IdentityFile, nil
 	case "proxy-jump", "proxy_jump", "proxyjump":

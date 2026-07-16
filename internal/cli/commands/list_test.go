@@ -252,6 +252,91 @@ func TestHandleListRejectsFieldWithJSON(t *testing.T) {
 	}
 }
 
+func TestHandleListShowPasswordsWithAutoYes(t *testing.T) {
+	connPath, keyPath := prepareListFixture(t, []model.SSHConnection{
+		{Username: "ubuntu", Host: "1.2.3.4", Password: "secret", AuthMode: model.AuthModePassword, Alias: "prod"},
+		{Username: "root", Host: "db.internal", AuthMode: model.AuthModeAgent, Alias: "db"},
+	})
+
+	var out strings.Builder
+	if err := handleList(connPath, keyPath, []string{"-p", "-y"}, &out); err != nil {
+		t.Fatalf("handleList failed: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "PASSWORD") {
+		t.Fatalf("expected PASSWORD column in output, got %q", got)
+	}
+	if !strings.Contains(got, "secret") {
+		t.Fatalf("expected password value in output, got %q", got)
+	}
+}
+
+func TestHandleListShowPasswordsCombinedShortFlag(t *testing.T) {
+	connPath, keyPath := prepareListFixture(t, []model.SSHConnection{
+		{Username: "ubuntu", Host: "1.2.3.4", Password: "secret", AuthMode: model.AuthModePassword, Alias: "prod"},
+	})
+
+	var out strings.Builder
+	if err := handleList(connPath, keyPath, []string{"-py"}, &out); err != nil {
+		t.Fatalf("handleList failed: %v", err)
+	}
+
+	got := out.String()
+	if !strings.Contains(got, "PASSWORD") || !strings.Contains(got, "secret") {
+		t.Fatalf("expected combined -py to reveal passwords, got %q", got)
+	}
+}
+
+func TestHandleListWithoutPasswordFlagOmitsPassword(t *testing.T) {
+	connPath, keyPath := prepareListFixture(t, []model.SSHConnection{
+		{Username: "ubuntu", Host: "1.2.3.4", Password: "supersecret", AuthMode: model.AuthModePassword, Alias: "prod"},
+	})
+
+	var out strings.Builder
+	if err := handleList(connPath, keyPath, nil, &out); err != nil {
+		t.Fatalf("handleList failed: %v", err)
+	}
+
+	got := out.String()
+	if strings.Contains(got, "supersecret") || strings.Contains(got, "PASSWORD") {
+		t.Fatalf("expected password to stay hidden without -p, got %q", got)
+	}
+}
+
+func TestHandleListShowPasswordsJSONWithAutoYes(t *testing.T) {
+	connPath, keyPath := prepareListFixture(t, []model.SSHConnection{
+		{Username: "ubuntu", Host: "1.2.3.4", Password: "secret", AuthMode: model.AuthModePassword, Alias: "prod"},
+	})
+
+	var out strings.Builder
+	if err := handleList(connPath, keyPath, []string{"--json", "-p", "-y"}, &out); err != nil {
+		t.Fatalf("handleList failed: %v", err)
+	}
+
+	var payload []map[string]any
+	if err := json.Unmarshal([]byte(out.String()), &payload); err != nil {
+		t.Fatalf("failed to decode json output: %v\nraw: %s", err, out.String())
+	}
+	if payload[0]["password"] != "secret" {
+		t.Fatalf("expected password in json output with -p -y, got %v", payload[0]["password"])
+	}
+}
+
+func TestHandleListFieldOutputPassword(t *testing.T) {
+	connPath, keyPath := prepareListFixture(t, []model.SSHConnection{
+		{Username: "ubuntu", Host: "1.2.3.4", Password: "secret", AuthMode: model.AuthModePassword, Alias: "prod"},
+	})
+
+	var out strings.Builder
+	if err := handleList(connPath, keyPath, []string{"-y", "-p", "--field", "password"}, &out); err != nil {
+		t.Fatalf("handleList failed: %v", err)
+	}
+	if !strings.Contains(out.String(), "secret") {
+		t.Fatalf("expected password field output, got %q", out.String())
+	}
+}
+
 func TestHandleListFiltersByGroupAndTag(t *testing.T) {
 	connPath, keyPath := prepareListFixture(t, []model.SSHConnection{
 		{Username: "ubuntu", Host: "api.internal", AuthMode: model.AuthModeAgent, Alias: "api", Group: "production", Tags: []string{"linux", "api"}},
