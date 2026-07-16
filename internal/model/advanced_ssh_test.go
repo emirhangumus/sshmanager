@@ -30,6 +30,28 @@ func TestValidateProxyJump(t *testing.T) {
 	}
 }
 
+func TestParseProxyJumpHop(t *testing.T) {
+	user, host, port, err := ParseProxyJumpHop("jumpuser@bastion.example.com:2222")
+	if err != nil {
+		t.Fatalf("ParseProxyJumpHop unexpected error: %v", err)
+	}
+	if user != "jumpuser" || host != "bastion.example.com" || port != "2222" {
+		t.Fatalf("unexpected parse result: user=%q host=%q port=%q", user, host, port)
+	}
+
+	user, host, port, err = ParseProxyJumpHop("bastion.example.com")
+	if err != nil {
+		t.Fatalf("ParseProxyJumpHop unexpected error: %v", err)
+	}
+	if user != "" || host != "bastion.example.com" || port != "" {
+		t.Fatalf("unexpected parse result: user=%q host=%q port=%q", user, host, port)
+	}
+
+	if _, _, _, err := ParseProxyJumpHop("bad hop"); err == nil {
+		t.Fatal("expected error for invalid hop, got nil")
+	}
+}
+
 func TestValidateForwardSpec(t *testing.T) {
 	valid := []string{
 		"8080:127.0.0.1:80",

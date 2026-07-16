@@ -8,7 +8,7 @@ import (
 )
 
 var (
-	proxyJumpHopPattern = regexp.MustCompile(`^(?:[^@\s,]+@)?(?:\[[^\]\s,]+\]|[^:@\s,]+)(?::(\d{1,5}))?$`)
+	proxyJumpHopPattern = regexp.MustCompile(`^(?:([^@\s,]+)@)?(\[[^\]\s,]+\]|[^:@\s,]+)(?::(\d{1,5}))?$`)
 	forwardSpecPattern  = regexp.MustCompile(`^(?:([^:\s]+):)?(\d{1,5}):([^:\s]+|\[[^\]\s]+\]):(\d{1,5})$`)
 	sshOptionKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*$`)
 )
@@ -81,19 +81,36 @@ func ValidateProxyJump(proxyJump string) error {
 		if trimmedHop == "" {
 			return fmt.Errorf("proxy jump cannot contain empty hops")
 		}
-		matches := proxyJumpHopPattern.FindStringSubmatch(trimmedHop)
-		if matches == nil {
-			return fmt.Errorf("invalid proxy jump hop %q", trimmedHop)
-		}
-		if matches[1] != "" {
-			port, err := strconv.Atoi(matches[1])
-			if err != nil || port < 1 || port > 65535 {
-				return fmt.Errorf("invalid proxy jump port in %q", trimmedHop)
-			}
+		if _, _, _, err := ParseProxyJumpHop(trimmedHop); err != nil {
+			return err
 		}
 	}
 
 	return nil
+}
+
+// ParseProxyJumpHop parses a single "[user@]host[:port]" proxy jump hop into
+// its components. The port is returned as a string ("" when not specified)
+// since callers typically pass it straight back into ssh argv/ProxyCommand
+// text rather than needing it as an int.
+func ParseProxyJumpHop(hop string) (user, host, port string, err error) {
+	trimmedHop := strings.TrimSpace(hop)
+	matches := proxyJumpHopPattern.FindStringSubmatch(trimmedHop)
+	if matches == nil {
+		return "", "", "", fmt.Errorf("invalid proxy jump hop %q", trimmedHop)
+	}
+
+	user = matches[1]
+	host = matches[2]
+	port = matches[3]
+	if port != "" {
+		p, convErr := strconv.Atoi(port)
+		if convErr != nil || p < 1 || p > 65535 {
+			return "", "", "", fmt.Errorf("invalid proxy jump port in %q", trimmedHop)
+		}
+	}
+
+	return user, host, port, nil
 }
 
 func ValidateForwardSpecs(specs []string) error {

@@ -288,6 +288,8 @@ func normalizeImportedConnection(conn model.SSHConnection) (model.SSHConnection,
 	conn.Username = strings.TrimSpace(conn.Username)
 	conn.Host = strings.TrimSpace(conn.Host)
 	conn.ProxyJump = strings.TrimSpace(conn.ProxyJump)
+	conn.ProxyJumpAuthMode = model.NormalizeAuthMode(conn.ProxyJumpAuthMode)
+	conn.ProxyJumpIdentityFile = strings.TrimSpace(conn.ProxyJumpIdentityFile)
 	conn.Group = strings.TrimSpace(conn.Group)
 	conn.Description = strings.TrimSpace(conn.Description)
 	conn.Alias = strings.TrimSpace(conn.Alias)
@@ -309,6 +311,29 @@ func normalizeImportedConnection(conn model.SSHConnection) (model.SSHConnection,
 	}
 	if err := model.ValidateProxyJump(conn.ProxyJump); err != nil {
 		return model.SSHConnection{}, fmt.Errorf("imported connection has invalid proxyJump: %w", err)
+	}
+	if conn.ProxyJump == "" {
+		conn.ProxyJumpAuthMode = ""
+		conn.ProxyJumpPassword = ""
+		conn.ProxyJumpIdentityFile = ""
+	} else if conn.ProxyJumpAuthMode != "" && !model.IsValidAuthMode(conn.ProxyJumpAuthMode) {
+		return model.SSHConnection{}, fmt.Errorf("imported connection has invalid proxyJumpAuthMode %q", conn.ProxyJumpAuthMode)
+	} else {
+		switch conn.EffectiveProxyJumpAuthMode() {
+		case model.AuthModePassword:
+			conn.ProxyJumpIdentityFile = ""
+			if strings.TrimSpace(conn.ProxyJumpPassword) == "" {
+				return model.SSHConnection{}, errors.New("imported connection has proxy jump password auth but is missing proxyJumpPassword")
+			}
+		case model.AuthModeKey:
+			conn.ProxyJumpPassword = ""
+			if conn.ProxyJumpIdentityFile == "" {
+				return model.SSHConnection{}, errors.New("imported connection has proxy jump key auth but is missing proxyJumpIdentityFile")
+			}
+		case model.AuthModeAgent:
+			conn.ProxyJumpPassword = ""
+			conn.ProxyJumpIdentityFile = ""
+		}
 	}
 	if err := model.ValidateForwardSpecs(conn.LocalForwards); err != nil {
 		return model.SSHConnection{}, fmt.Errorf("imported connection has invalid localForwards: %w", err)

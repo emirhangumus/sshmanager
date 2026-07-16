@@ -68,6 +68,40 @@ func TestHandleAddArgsAddsConnection(t *testing.T) {
 	}
 }
 
+func TestHandleAddArgsAddsConnectionWithProxyJumpPassword(t *testing.T) {
+	connPath, keyPath := prepareTransferFixture(t, nil)
+
+	var out strings.Builder
+	err := handleAddArgs(connPath, keyPath, []string{
+		"--host", "internal.example.com",
+		"--username", "targetuser",
+		"--auth-mode", model.AuthModePassword,
+		"--password", "target-secret",
+		"--alias", "internal-server",
+		"--proxy-jump", "jumpuser@bastion.example.com",
+		"--proxy-jump-auth-mode", model.AuthModePassword,
+		"--proxy-jump-password", "jump-secret",
+	}, &out)
+	if err != nil {
+		t.Fatalf("handleAddArgs failed: %v", err)
+	}
+
+	loaded := loadTransferConnections(t, connPath, keyPath)
+	conn := loaded.GetConnectionByAlias("internal-server")
+	if conn == nil {
+		t.Fatal("expected saved connection with alias internal-server")
+	}
+	if conn.ProxyJump != "jumpuser@bastion.example.com" {
+		t.Fatalf("unexpected proxy jump: %q", conn.ProxyJump)
+	}
+	if conn.EffectiveProxyJumpAuthMode() != model.AuthModePassword {
+		t.Fatalf("unexpected proxy jump auth mode: %q", conn.EffectiveProxyJumpAuthMode())
+	}
+	if conn.ProxyJumpPassword != "jump-secret" {
+		t.Fatalf("unexpected proxy jump password: %q", conn.ProxyJumpPassword)
+	}
+}
+
 func TestHandleAddArgsRejectsInvalidInput(t *testing.T) {
 	connPath, keyPath := prepareTransferFixture(t, nil)
 
@@ -153,6 +187,36 @@ func TestHandleEditArgsUpdatesConnection(t *testing.T) {
 	}
 	if len(updated.Tags) != 2 || updated.Tags[0] != "linux" || updated.Tags[1] != "api" {
 		t.Fatalf("unexpected tags: %v", updated.Tags)
+	}
+}
+
+func TestHandleEditArgsClearsProxyJumpPassword(t *testing.T) {
+	connPath, keyPath := prepareTransferFixture(t, []model.SSHConnection{
+		{
+			Username:          "targetuser",
+			Host:              "internal.example.com",
+			AuthMode:          model.AuthModeAgent,
+			ProxyJump:         "jumpuser@bastion.example.com",
+			ProxyJumpPassword: "jump-secret",
+			Alias:             "internal-server",
+		},
+	})
+
+	err := handleEditArgs(connPath, keyPath, []string{
+		"--alias", "internal-server",
+		"--clear-proxy-jump-password",
+	}, ioDiscard())
+	if err != nil {
+		t.Fatalf("handleEditArgs failed: %v", err)
+	}
+
+	loaded := loadTransferConnections(t, connPath, keyPath)
+	updated := loaded.GetConnectionByAlias("internal-server")
+	if updated == nil {
+		t.Fatal("expected updated connection")
+	}
+	if updated.ProxyJumpPassword != "" {
+		t.Fatalf("expected proxy jump password to be cleared, got %q", updated.ProxyJumpPassword)
 	}
 }
 
