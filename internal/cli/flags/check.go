@@ -43,6 +43,9 @@ Connection Commands:
   connect [flags]
         Connect to a saved host (interactive if no flags)
         Target: --alias <alias> | --id <connection-id>
+  scp [-r] <src...> <dest>
+        Copy files to/from a saved host using alias:path syntax
+        Exactly one alias must appear among src/dest (e.g. myserver:/path)
   list [flags]
         List saved connections
         --json
