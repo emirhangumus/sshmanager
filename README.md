@@ -13,7 +13,8 @@ SSH Manager is a terminal application for storing and connecting to SSH hosts fr
 - Lock-protected connection mutations to reduce concurrent write races
 - Add, edit, remove, and connect from an interactive menu
 - Direct alias connection (`sshmanager myserver`)
-- Scriptable subcommands: `add`, `edit`, `remove`, `connect`, `list`, `export`, `import`, `backup`, `restore`, `doctor`, `clean`, `set`, `version`, `complete`, `completion`
+- Scriptable subcommands: `add`, `edit`, `remove`, `connect`, `scp`, `list`, `export`, `import`, `backup`, `restore`, `doctor`, `clean`, `set`, `version`, `complete`, `completion`
+- File transfer to/from saved hosts using alias syntax (`sshmanager scp file.txt myserver:/path`)
 - Alias rename command (`rename`)
 - Grouping/tagging metadata with list filtering (`--group`, `--tag`)
 - Multiple SSH auth modes: `password`, `key`, `agent`
@@ -124,6 +125,22 @@ sshmanager remove --id <connection-id> --yes
 sshmanager connect --alias prod
 sshmanager connect --id <connection-id>
 ```
+
+- Copy files to/from a saved host (`scp` using alias syntax):
+
+```bash
+sshmanager scp ./file.txt myserver:/home/user1
+sshmanager scp myserver:/var/log/app.log ./logs/
+sshmanager scp -r ./dist myserver:/srv/www
+```
+
+`scp` resolves `myserver` the same way `connect` does (same auth mode,
+identity file, ProxyJump, and extra SSH args), then rewrites it to
+`user@host:path` before shelling out to `scp`/`sshpass -e scp`. Exactly one
+sshmanager alias may appear among the source(s)/destination — the rest are
+treated as plain local paths, so ordinary multi-file/local-to-local usage
+still works. Transferring directly between two different sshmanager
+aliases in one invocation is not supported.
 
 - Export encrypted store contents to plaintext backup:
 
