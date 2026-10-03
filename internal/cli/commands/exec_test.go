@@ -109,9 +109,7 @@ func TestRunExecStreamsAndPreservesExitStatus(t *testing.T) {
 	}
 	path := filepath.Join(t.TempDir(), "ssh")
 	fake := "#!/bin/sh\nprintf 'args:%s\\n' \"$*\"\nprintf 'input:'\ncat\nprintf 'remote warning\\n' >&2\nexit 37\n"
-	if err := os.WriteFile(path, []byte(fake), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	writeFakeExecutable(t, path, fake)
 	t.Setenv("PATH", filepath.Dir(path)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var stdout, stderr strings.Builder
 	err := runExec("ssh", []string{"-T", "ubuntu@example.com", "echo ok"}, nil,
@@ -137,9 +135,7 @@ func TestRunExecPasswordUsesEnvironmentAndStreamsStdin(t *testing.T) {
 		"ssh-keygen": "#!/bin/sh\nexit 0\n",
 		"sshpass":    "#!/bin/sh\nprintf 'password:%s\\nargs:%s\\n' \"$SSHPASS\" \"$*\"\ncat\n",
 	} {
-		if err := os.WriteFile(filepath.Join(binDir, name), []byte(content), 0o700); err != nil {
-			t.Fatal(err)
-		}
+		writeFakeExecutable(t, filepath.Join(binDir, name), content)
 	}
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	conn := &model.SSHConnection{Username: "ubuntu", Host: "example.com", Password: "secret", AuthMode: model.AuthModePassword}
@@ -175,9 +171,7 @@ func TestHandleExecArgsCommandAndScript(t *testing.T) {
 	sshPath := filepath.Join(binDir, "ssh")
 	capturePath := filepath.Join(t.TempDir(), "capture")
 	fake := "#!/bin/sh\nprintf '%s\\n' \"$*\" > \"$SSHMANAGER_TEST_CAPTURE\"\ncase \"$*\" in *' -s') cat >> \"$SSHMANAGER_TEST_CAPTURE\" ;; esac\n"
-	if err := os.WriteFile(sshPath, []byte(fake), 0o700); err != nil {
-		t.Fatal(err)
-	}
+	writeFakeExecutable(t, sshPath, fake)
 	t.Setenv("PATH", binDir+string(os.PathListSeparator)+os.Getenv("PATH"))
 	t.Setenv("SSHMANAGER_TEST_CAPTURE", capturePath)
 
@@ -216,5 +210,15 @@ func TestHandleExecArgsRejectsInvalidScript(t *testing.T) {
 		if err := HandleExecArgs(connPath, keyPath, []string{"--alias", "prod", "--script", path}); err == nil {
 			t.Fatalf("expected script validation error for %q", path)
 		}
+	}
+}
+
+func writeFakeExecutable(t *testing.T, path, content string) {
+	t.Helper()
+	if err := os.WriteFile(path, []byte(content), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	if err := os.Chmod(path, 0o700); err != nil {
+		t.Fatal(err)
 	}
 }
