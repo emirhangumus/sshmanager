@@ -80,6 +80,8 @@ func Run(args []string, build BuildInfo) error {
 			return commands.HandleRenameArgs(connectionFilePath, secretKeyFilePath, normalizedArgs[2:])
 		case "connect":
 			return commands.HandleConnectArgs(connectionFilePath, secretKeyFilePath, configFilePath, normalizedArgs[2:])
+		case "exec":
+			return commands.HandleExecArgs(connectionFilePath, secretKeyFilePath, normalizedArgs[2:])
 		case "scp":
 			return commands.HandleScpArgs(connectionFilePath, secretKeyFilePath, normalizedArgs[2:])
 		case "list":

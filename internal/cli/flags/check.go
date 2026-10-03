@@ -43,6 +43,10 @@ Connection Commands:
   connect [flags]
         Connect to a saved host (interactive if no flags)
         Target: --alias <alias> | --id <connection-id>
+  exec (--alias <alias> | --id <connection-id>) -- <command-string>
+        Run one remote command without a TTY; return its exit status
+  exec (--alias <alias> | --id <connection-id>) --script <local-file> [--shell sh|bash]
+        Stream a local script to sh -s (default) or bash -s on the remote host
   scp [-r] <src...> <dest>
         Copy files to/from a saved host using alias:path syntax
         Exactly one alias must appear among src/dest (e.g. myserver:/path)
