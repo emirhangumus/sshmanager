@@ -29,3 +29,4 @@ vendor/
 .sshmanager/
 # Added by goreleaser init:
 dist/
+temp/
