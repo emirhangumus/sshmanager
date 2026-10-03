@@ -13,7 +13,7 @@ SSH Manager is a terminal application for storing and connecting to SSH hosts fr
 - Lock-protected connection mutations to reduce concurrent write races
 - Add, edit, remove, and connect from an interactive menu
 - Direct alias connection (`sshmanager myserver`)
-- Scriptable subcommands: `add`, `edit`, `remove`, `connect`, `scp`, `list`, `export`, `import`, `backup`, `restore`, `doctor`, `clean`, `set`, `version`, `complete`, `completion`
+- Scriptable subcommands: `add`, `edit`, `remove`, `connect`, `exec`, `scp`, `list`, `export`, `import`, `backup`, `restore`, `doctor`, `clean`, `set`, `version`, `complete`, `completion`
 - File transfer to/from saved hosts using alias syntax (`sshmanager scp file.txt myserver:/path`)
 - Alias rename command (`rename`)
 - Grouping/tagging metadata with list filtering (`--group`, `--tag`)
@@ -125,6 +125,22 @@ sshmanager remove --id <connection-id> --yes
 sshmanager connect --alias prod
 sshmanager connect --id <connection-id>
 ```
+
+- Run a command or stream a local script to a saved host without a TTY:
+
+```bash
+sshmanager exec --alias prod -- 'uname -a'
+sshmanager exec --id <connection-id> -- '/path/to/remote-script.sh'
+sshmanager exec --alias prod --script ./deploy.sh
+sshmanager exec --alias prod --script ./check.sh --shell bash
+```
+
+The command form takes one shell command string after `--`; the remote shell
+interprets it. The script form streams a local file to `sh -s` by default or
+`bash -s` when selected, so the chosen interpreter must exist on the remote
+host. Output streams live and the process returns the remote command's exit
+status when available. Script arguments are not supported. Saved port
+forwards are ignored for one-shot execution.
 
 - Copy files to/from a saved host (`scp` using alias syntax):
 

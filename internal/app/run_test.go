@@ -69,6 +69,7 @@ func TestRunHelpShowsSubcommandStyleWithoutDashOptions(t *testing.T) {
 
 	for _, snippet := range []string{
 		"  add [flags]",
+		"  exec (--alias <alias> | --id <connection-id>) -- <command-string>",
 		"  list [flags]",
 		"  doctor [--json]",
 		"  clean",
@@ -80,6 +81,14 @@ func TestRunHelpShowsSubcommandStyleWithoutDashOptions(t *testing.T) {
 	}
 	if strings.Contains(output, "  -clean") {
 		t.Fatalf("expected help output without dash-prefixed options, got %q", output)
+	}
+}
+
+func TestRunExecDispatchesToCommandHandler(t *testing.T) {
+	setHomeEnv(t, t.TempDir())
+	err := Run([]string{"sshmanager", "exec", "--alias", "missing", "--", "true"}, BuildInfo{})
+	if err == nil || !strings.Contains(err.Error(), "No SSH connection found for alias: missing") {
+		t.Fatalf("expected missing alias error from exec handler, got %v", err)
 	}
 }
 
