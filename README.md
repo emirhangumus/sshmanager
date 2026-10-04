@@ -1,35 +1,48 @@
 # SSH Manager
 
-SSH Manager is a terminal application for storing and connecting to SSH hosts from an interactive menu or alias command.
+SSH Manager (`sshmanager`) is an open-source SSH connection manager for Linux,
+macOS, and Windows, written in Go. It combines a terminal user interface (TUI)
+with a scriptable command-line interface (CLI) for saving hosts, connecting by
+alias, running remote commands, and transferring files with SCP.
+
+Built on your system's OpenSSH tools, SSH Manager supports SSH keys, SSH agents,
+password authentication, jump hosts, and port forwarding. Saved connection data
+is encrypted with AES-GCM, and its encryption key is protected by the OS keyring
+by default.
+
+## When to use SSH Manager
+
+- You manage several development, staging, or production hosts and want named shortcuts instead of repeatedly typing connection details.
+- You want a TUI to browse and maintain saved connections, alongside CLI commands for scripts and automation.
+- You need the same saved host settings for SSH sessions, remote command execution, and SCP file transfers.
+- You want to organize hosts with groups and tags and keep saved credentials encrypted locally.
 
 ## Demo
 
-![Demo](demo.gif)
+![SSH Manager TUI demonstration](demo.gif)
 
 ## Features
 
-- AES-GCM encrypted storage for saved connections
-- OS keyring protection by default, with configurable local key storage and recoverable migration
-- Atomic file writes for connection/config persistence
-- Lock-protected connection mutations to reduce concurrent write races
-- Add, edit, remove, and connect from an interactive menu
-- Direct alias connection (`sshmanager myserver`)
-- Scriptable subcommands: `add`, `edit`, `remove`, `connect`, `exec`, `scp`, `list`, `export`, `import`, `backup`, `restore`, `doctor`, `clean`, `set`, `version`, `complete`, `completion`
-- File transfer to/from saved hosts using alias syntax (`sshmanager scp file.txt myserver:/path`)
-- Alias rename command (`rename`)
-- Grouping/tagging metadata with list filtering (`--group`, `--tag`)
-- Multiple SSH auth modes: `password`, `key`, `agent`
-- Port and identity-file support per connection
-- Advanced SSH options: ProxyJump, local/remote forwarding, controlled extra args
-- Configurable post-SSH behavior (`behaviour.continueAfterSSHExit`)
-- Shell completion support for Bash and Zsh
-- Best-effort secure cleanup (`clean`) for connection and key files
+- **TUI and CLI:** add, edit, rename, remove, and select saved hosts from the TUI or use explicit subcommands.
+- **Alias connections:** connect with `sshmanager myserver`, or select a connection by its stable ID.
+- **SSH authentication:** use password, private-key, or SSH-agent authentication with saved ports and identity-file paths.
+- **Jump hosts and tunnels:** configure ProxyJump, separate jump-host credentials, local/remote port forwarding, and supported extra SSH arguments.
+- **Remote execution and SCP:** run commands, stream local scripts, and copy files using saved connection settings.
+- **Host organization:** group and tag hosts, add descriptions, and filter connection lists.
+- **Automation:** JSON output, selectable list fields, remote exit-status propagation, and Bash/Zsh completion.
+- **Encrypted storage:** AES-GCM connection encryption, OS keyring protection by default, optional file-key storage, and recoverable switching between modes.
+- **Recovery and diagnostics:** YAML/JSON import and export, configuration-aware backups and restores, `doctor` checks, and confirmed cleanup.
 
 ## Requirements
 
-- Go `1.23.2+`
 - OpenSSH client (`ssh`)
+- OpenSSH `scp` for file transfers
 - `sshpass` (required only for `password` auth mode)
+- An accessible OS keyring for the default storage mode; headless systems can explicitly select [file storage](#configuration)
+
+Building from source also requires Go **1.24+**. The Makefile workflow requires
+`make`; its `install` target checks for `sshpass` even when you plan to use key or
+agent authentication.
 
 Example (Debian/Ubuntu):
 
@@ -39,6 +52,14 @@ sudo apt install openssh-client sshpass
 
 ## Installation
 
+### Install with Go
+
+```bash
+go install github.com/emirhangumus/sshmanager/cmd/sshmanager@latest
+```
+
+### Build from a checkout
+
 ```bash
 git clone https://github.com/emirhangumus/sshmanager.git
 cd sshmanager
@@ -46,15 +67,54 @@ make build
 make install
 ```
 
-Run:
+This installs `sshmanager` into `~/.local/bin`. Ensure that directory is on your
+`PATH`.
+
+Alternatively, install with Go directly:
+
+```bash
+go install ./cmd/sshmanager
+```
+
+## Quick start
+
+Save a host using your SSH agent, connect by alias, and reuse the connection for
+a remote command and file transfer:
+
+```bash
+sshmanager add --host app.example.com --username ubuntu --auth-mode agent --alias prod --group production --tag api
+sshmanager prod
+sshmanager exec --alias prod -- 'uptime'
+sshmanager scp ./file.txt prod:/home/ubuntu/
+sshmanager list --group production --json
+```
+
+Replace the example host and username with your own. For private-key authentication,
+use `--auth-mode key --identity-file ~/.ssh/id_ed25519`. For guided connection
+creation, run `sshmanager add` without flags.
+
+Launch the TUI to manage and select hosts:
 
 ```bash
 sshmanager
 ```
 
+On a headless machine without an OS keyring, choose file storage before adding
+your first connection:
+
+```bash
+sshmanager set security.keyStorage file
+```
+
+Use `sshmanager help` for the command overview. The examples below cover each
+workflow in more detail.
+
 ## Usage
 
-### Interactive menu
+### Terminal user interface (TUI)
+
+Running without a subcommand opens the TUI, where you can add, edit, rename,
+remove, and connect to saved hosts.
 
 ```bash
 sshmanager
@@ -68,7 +128,7 @@ sshmanager myserver
 
 ### Subcommands
 
-- List saved connections:
+#### List and filter hosts
 
 ```bash
 sshmanager list
@@ -79,7 +139,7 @@ sshmanager list --group production
 sshmanager list --group production --tag api
 ```
 
-- Add a connection non-interactively:
+#### Add hosts from the CLI
 
 ```bash
 sshmanager add --host app.internal --username ubuntu --auth-mode agent --alias prod
@@ -97,7 +157,7 @@ to `ssh -J`, relying on the system's own key/agent/ssh_config for the hop).
 A dedicated jump password or identity file is only supported for a single
 ProxyJump hop.
 
-- Edit a connection non-interactively:
+#### Edit saved connections
 
 ```bash
 sshmanager edit --alias prod --new-host new.internal --new-port 2222
@@ -106,28 +166,30 @@ sshmanager edit --id <connection-id> --new-auth-mode key --new-identity-file ~/.
 sshmanager edit --alias prod --new-proxy-jump bastion.internal:2222 --new-local-forward 8080:127.0.0.1:80 --new-remote-forward 9000:127.0.0.1:9000 --new-extra-ssh-arg -vv --new-extra-ssh-arg -o --new-extra-ssh-arg ServerAliveInterval=30
 ```
 
-- Rename alias:
+#### Rename aliases
 
 ```bash
 sshmanager rename --alias prod --to prod-new
 sshmanager rename --id <connection-id> --to prod-new
 ```
 
-- Remove a connection non-interactively:
+#### Remove saved connections
 
 ```bash
 sshmanager remove --alias prod --yes
 sshmanager remove --id <connection-id> --yes
 ```
 
-- Connect explicitly (subcommand form):
+#### Connect by alias or ID
 
 ```bash
 sshmanager connect --alias prod
 sshmanager connect --id <connection-id>
 ```
 
-- Run a command or stream a local script to a saved host without a TTY:
+#### Run remote commands and scripts
+
+Run a command or stream a local script to a saved host without a TTY:
 
 ```bash
 sshmanager exec --alias prod -- 'uname -a'
@@ -143,7 +205,7 @@ host. Output streams live and the process returns the remote command's exit
 status when available. Script arguments are not supported. Saved port
 forwards are ignored for one-shot execution.
 
-- Copy files to/from a saved host (`scp` using alias syntax):
+#### Transfer files with SCP
 
 ```bash
 sshmanager scp ./file.txt myserver:/home/user1
@@ -159,14 +221,16 @@ treated as plain local paths, so ordinary multi-file/local-to-local usage
 still works. Transferring directly between two different sshmanager
 aliases in one invocation is not supported.
 
-- Export encrypted store contents to plaintext backup:
+#### Export and import connections
+
+Export decrypted connection data to a plaintext YAML or JSON file:
 
 ```bash
 sshmanager export --out ./connections.yaml --format yaml
 sshmanager export --out ./connections.json --format json
 ```
 
-- Import connection backups:
+Import connection backups:
 
 ```bash
 sshmanager import --in ./connections.yaml --mode merge
@@ -178,14 +242,16 @@ Import modes:
 - `merge`: update existing entries by `id` (then by alias), add missing entries.
 - `replace`: replace the entire connection set with imported data.
 
-- Create full recovery backups (connections + optional config):
+#### Back up and restore
+
+Create a recovery backup containing connections and optional configuration:
 
 ```bash
 sshmanager backup --out ./snapshot.yaml --format yaml
 sshmanager backup --out ./snapshot.json --format json --include-config=false
 ```
 
-- Restore from recovery backups:
+Restore from a recovery backup:
 
 ```bash
 sshmanager restore --in ./snapshot.yaml --mode merge
@@ -197,7 +263,7 @@ Restore modes:
 - `merge`: merge restored entries into existing data.
 - `replace`: replace the entire connection set with restored data.
 
-- Run diagnostics for file/key/data consistency:
+#### Diagnose storage and configuration
 
 ```bash
 sshmanager doctor
@@ -259,7 +325,7 @@ source ~/.bashrc
 
 | Key | Default | Type | Description |
 |---|---|---|---|
-| `behaviour.continueAfterSSHExit` | `false` | boolean | If `true`, return to menu after SSH exits. If `false`, exit the app after SSH session ends. |
+| `behaviour.continueAfterSSHExit` | `false` | boolean | If `true`, return to the TUI after SSH exits. If `false`, exit the app after SSH session ends. |
 | `behaviour.showCredentialsOnConnect` | `false` | boolean | If `true`, prints username and password before opening SSH connection. |
 | `security.keyStorage` | `keyring` | `keyring` or `file` | Where the encryption key is stored. Switching migrates the existing key and preserves saved passwords. |
 
@@ -290,7 +356,7 @@ Direct config edits and restoring a config use the same migration checks.
 The keyring integration uses [`github.com/zalando/go-keyring`](https://github.com/zalando/go-keyring):
 
 - macOS: the user Keychain, accessed through `/usr/bin/security`.
-- Linux/BSD: a session D-Bus Secret Service, such as GNOME Keyring, with a `login` collection.
+- Linux/BSD: a session D-Bus Secret Service, such as GNOME Keyring or KDE's KSecretD. The integration uses the `login` collection when available, otherwise the default collection.
 - Windows: Windows Credential Manager.
 
 Unlock the OS keyring when prompted. For headless systems without a keyring, select
@@ -385,6 +451,35 @@ in `key-storage.yaml`, so switching back to file mode requires the matching pass
 and restores the original protection. Ordinary keyring use does not need that
 passphrase. Raw-key installations switch back to a raw key file.
 
+## Frequently asked questions
+
+### Does SSH Manager replace OpenSSH?
+
+SSH Manager manages saved connection details and invokes your system's `ssh` and
+`scp` tools. SSH keys and agents continue to work through OpenSSH. Saved connections
+live in SSH Manager's own store; it does not automatically import your
+`~/.ssh/config` hosts.
+
+### Are individual passwords stored in the OS keyring?
+
+The keyring stores one AES-256 encryption key per SSH Manager data store. Host and
+ProxyJump passwords remain inside the encrypted local connection file. Switching
+between keyring and file storage moves the same encryption key and verifies the
+saved data before committing the change.
+
+### Can I use it from scripts or AI coding tools?
+
+The CLI supports noninteractive host management, `list --json`, field selection,
+remote commands through `exec`, and file transfers through `scp`. An AI coding tool
+with terminal access can invoke these same commands. SSH Manager does not include
+an AI model or require an AI service.
+
+### Can I use it on a headless server?
+
+Yes. Set `security.keyStorage` to `file` before first use if no OS keyring is
+available. The CLI works without opening the TUI. SSH-agent or private-key
+authentication avoids the runtime `sshpass` dependency.
+
 ## Development
 
 ```bash
@@ -396,9 +491,11 @@ make lint
 ## Security notes
 
 - Connection data is encrypted at rest using AES-GCM.
+- Backups and exports contain plaintext connection data, including saved passwords; protect these files separately.
 - Key files are validated and stored with restrictive permissions.
 - OS keyring mode avoids storing the raw encryption key alongside encrypted connections.
 - Password-mode connections pass passwords to `sshpass` via environment variable (`SSHPASS`) instead of CLI args.
+- Passwords supplied to `add --password` or `edit --new-password` can appear in shell history and process arguments. Use the guided TUI forms to enter passwords without putting them on the command line.
 - Key/agent modes use OpenSSH directly (no `sshpass` dependency at runtime).
 - Optional master passphrase mode derives encryption keys from `SSHMANAGER_MASTER_PASSPHRASE`.
 - State file writes use atomic temp-write + rename flow.
