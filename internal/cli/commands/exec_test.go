@@ -9,7 +9,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emirhangumus/sshmanager/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
 )
 
 func TestParseExecArgs(t *testing.T) {

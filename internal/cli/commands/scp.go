@@ -10,9 +10,9 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/model"
-	"github.com/emirhangumus/sshmanager/internal/store"
-	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/store"
+	prompttext "github.com/emirhangumus/sshmanager/v2/internal/ui/prompt"
 )
 
 // scpArg is a single positional argument to the scp subcommand, classified

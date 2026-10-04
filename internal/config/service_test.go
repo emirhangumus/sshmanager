@@ -4,7 +4,7 @@ import (
 	"path/filepath"
 	"testing"
 
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 )
 
 func TestSetConfigAndLoadConfig(t *testing.T) {

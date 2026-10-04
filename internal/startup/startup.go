@@ -3,9 +3,9 @@ package startup
 import (
 	"fmt"
 
-	"github.com/emirhangumus/sshmanager/internal/config"
-	"github.com/emirhangumus/sshmanager/internal/storage"
-	"github.com/emirhangumus/sshmanager/internal/store"
+	"github.com/emirhangumus/sshmanager/v2/internal/config"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
+	"github.com/emirhangumus/sshmanager/v2/internal/store"
 )
 
 func Setup(connectionFilePath, configFilePath, secretKeyFilePath string) error {

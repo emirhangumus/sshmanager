@@ -4,8 +4,8 @@ import (
 	"fmt"
 	"os"
 
-	cryptoutil "github.com/emirhangumus/sshmanager/internal/crypto"
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	cryptoutil "github.com/emirhangumus/sshmanager/v2/internal/crypto"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 )
 
 func encryptAndStoreFile(data, filePath string, key []byte) error {

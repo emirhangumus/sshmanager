@@ -55,7 +55,7 @@ sudo apt install openssh-client sshpass
 ### Install with Go
 
 ```bash
-go install github.com/emirhangumus/sshmanager/cmd/sshmanager@latest
+go install github.com/emirhangumus/sshmanager/v2/cmd/sshmanager@latest
 ```
 
 ### Build from a checkout

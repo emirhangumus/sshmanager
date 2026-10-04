@@ -13,7 +13,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 )
 
 const (

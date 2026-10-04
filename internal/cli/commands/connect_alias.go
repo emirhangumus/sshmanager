@@ -4,9 +4,9 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/config"
-	"github.com/emirhangumus/sshmanager/internal/store"
-	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
+	"github.com/emirhangumus/sshmanager/v2/internal/config"
+	"github.com/emirhangumus/sshmanager/v2/internal/store"
+	prompttext "github.com/emirhangumus/sshmanager/v2/internal/ui/prompt"
 )
 
 func FindAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, alias string) error {

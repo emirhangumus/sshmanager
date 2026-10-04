@@ -5,8 +5,8 @@ import (
 	"log"
 	"os"
 
-	"github.com/emirhangumus/sshmanager/internal/app"
-	"github.com/emirhangumus/sshmanager/internal/cli/commands"
+	"github.com/emirhangumus/sshmanager/v2/internal/app"
+	"github.com/emirhangumus/sshmanager/v2/internal/cli/commands"
 )
 
 var (

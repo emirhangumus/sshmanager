@@ -1,4 +1,4 @@
-module github.com/emirhangumus/sshmanager
+module github.com/emirhangumus/sshmanager/v2
 
 go 1.24.0
 

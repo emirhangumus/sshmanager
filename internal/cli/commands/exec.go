@@ -9,9 +9,9 @@ import (
 	"os/exec"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/model"
-	"github.com/emirhangumus/sshmanager/internal/store"
-	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/store"
+	prompttext "github.com/emirhangumus/sshmanager/v2/internal/ui/prompt"
 )
 
 // ExecExitError carries the SSH process status to the top-level CLI. Detail

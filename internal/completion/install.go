@@ -6,7 +6,7 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/completion/scripts"
+	"github.com/emirhangumus/sshmanager/v2/internal/completion/scripts"
 )
 
 func Script(shell string) (string, error) {

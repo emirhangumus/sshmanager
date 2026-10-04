@@ -8,10 +8,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/completion"
-	"github.com/emirhangumus/sshmanager/internal/store"
-	"github.com/emirhangumus/sshmanager/internal/ui/progress"
-	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
+	"github.com/emirhangumus/sshmanager/v2/internal/completion"
+	"github.com/emirhangumus/sshmanager/v2/internal/store"
+	"github.com/emirhangumus/sshmanager/v2/internal/ui/progress"
+	prompttext "github.com/emirhangumus/sshmanager/v2/internal/ui/prompt"
 )
 
 func PrintUsage(out io.Writer) {

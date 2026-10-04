@@ -7,8 +7,8 @@ import (
 	"strings"
 	"time"
 
-	"github.com/emirhangumus/sshmanager/internal/model"
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 	"github.com/gofrs/flock"
 )
 

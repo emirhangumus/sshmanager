@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emirhangumus/sshmanager/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
 )
 
 func writeTestIdentityFile(t *testing.T) string {

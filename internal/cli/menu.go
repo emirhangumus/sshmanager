@@ -3,9 +3,9 @@ package cli
 import (
 	"fmt"
 
-	"github.com/emirhangumus/sshmanager/internal/cli/commands"
-	"github.com/emirhangumus/sshmanager/internal/config"
-	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
+	"github.com/emirhangumus/sshmanager/v2/internal/cli/commands"
+	"github.com/emirhangumus/sshmanager/v2/internal/config"
+	prompttext "github.com/emirhangumus/sshmanager/v2/internal/ui/prompt"
 )
 
 func ShowMainMenu(connectionFilePath, secretKeyFilePath, configFilePath, version string) error {

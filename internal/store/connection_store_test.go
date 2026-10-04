@@ -5,8 +5,8 @@ import (
 	"strings"
 	"testing"
 
-	cryptoutil "github.com/emirhangumus/sshmanager/internal/crypto"
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	cryptoutil "github.com/emirhangumus/sshmanager/v2/internal/crypto"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 )
 
 func TestLoadMigratesLegacyListAndAddsIDs(t *testing.T) {

@@ -10,10 +10,10 @@ import (
 	"sync"
 	"testing"
 
-	"github.com/emirhangumus/sshmanager/internal/config"
-	cryptoutil "github.com/emirhangumus/sshmanager/internal/crypto"
-	"github.com/emirhangumus/sshmanager/internal/model"
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/emirhangumus/sshmanager/v2/internal/config"
+	cryptoutil "github.com/emirhangumus/sshmanager/v2/internal/crypto"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 	"github.com/zalando/go-keyring"
 )
 

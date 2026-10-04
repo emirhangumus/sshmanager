@@ -6,7 +6,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 )
 
 func LoadConfig(configFilePath string) (SSHManagerConfig, error) {

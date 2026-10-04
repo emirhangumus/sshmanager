@@ -11,9 +11,9 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/model"
-	"github.com/emirhangumus/sshmanager/internal/storage"
-	"github.com/emirhangumus/sshmanager/internal/store"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/storage"
+	"github.com/emirhangumus/sshmanager/v2/internal/store"
 	"gopkg.in/yaml.v3"
 )
 

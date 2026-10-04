@@ -6,8 +6,8 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emirhangumus/sshmanager/internal/config"
-	"github.com/emirhangumus/sshmanager/internal/store"
+	"github.com/emirhangumus/sshmanager/v2/internal/config"
+	"github.com/emirhangumus/sshmanager/v2/internal/store"
 )
 
 func TestSetupCreatesInitialState(t *testing.T) {

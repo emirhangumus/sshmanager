@@ -6,7 +6,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/emirhangumus/sshmanager/internal/completion/scripts"
+	"github.com/emirhangumus/sshmanager/v2/internal/completion/scripts"
 )
 
 func TestScriptReturnsKnownShellScripts(t *testing.T) {

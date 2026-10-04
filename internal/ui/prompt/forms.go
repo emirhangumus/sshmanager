@@ -7,7 +7,7 @@ import (
 	"strconv"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/model"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
 )
 
 var (

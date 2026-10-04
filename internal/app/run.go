@@ -6,10 +6,10 @@ import (
 	"path/filepath"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/cli"
-	"github.com/emirhangumus/sshmanager/internal/cli/commands"
-	"github.com/emirhangumus/sshmanager/internal/cli/flags"
-	"github.com/emirhangumus/sshmanager/internal/startup"
+	"github.com/emirhangumus/sshmanager/v2/internal/cli"
+	"github.com/emirhangumus/sshmanager/v2/internal/cli/commands"
+	"github.com/emirhangumus/sshmanager/v2/internal/cli/flags"
+	"github.com/emirhangumus/sshmanager/v2/internal/startup"
 )
 
 type BuildInfo struct {
