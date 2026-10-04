@@ -9,6 +9,7 @@ SSH Manager is a terminal application for storing and connecting to SSH hosts fr
 ## Features
 
 - AES-GCM encrypted storage for saved connections
+- OS keyring protection by default, with configurable local key storage and recoverable migration
 - Atomic file writes for connection/config persistence
 - Lock-protected connection mutations to reduce concurrent write races
 - Add, edit, remove, and connect from an interactive menu
@@ -260,6 +261,61 @@ source ~/.bashrc
 |---|---|---|---|
 | `behaviour.continueAfterSSHExit` | `false` | boolean | If `true`, return to menu after SSH exits. If `false`, exit the app after SSH session ends. |
 | `behaviour.showCredentialsOnConnect` | `false` | boolean | If `true`, prints username and password before opening SSH connection. |
+| `security.keyStorage` | `keyring` | `keyring` or `file` | Where the encryption key is stored. Switching migrates the existing key and preserves saved passwords. |
+
+```yaml
+security:
+  keyStorage: keyring
+```
+
+Switch storage modes with:
+
+```bash
+sshmanager set security.keyStorage file
+sshmanager set security.keyStorage keyring
+```
+
+The CLI reports the current migration stage on stderr, with elapsed-time updates
+every two seconds while waiting (for example, for OS keyring approval). It reports
+completion, failure, or pending cleanup explicitly.
+
+The default also applies to older configurations that omit this setting. Existing
+file keys migrate on the next credential operation. Passwords (including ProxyJump
+passwords) stay inside the encrypted `conn` file; a mode switch moves the same key,
+verifies it can decrypt your data, and removes the obsolete source only after commit.
+Direct config edits and restoring a config use the same migration checks.
+
+### OS keyring requirements and recovery
+
+The keyring integration uses [`github.com/zalando/go-keyring`](https://github.com/zalando/go-keyring):
+
+- macOS: the user Keychain, accessed through `/usr/bin/security`.
+- Linux/BSD: a session D-Bus Secret Service, such as GNOME Keyring, with a `login` collection.
+- Windows: Windows Credential Manager.
+
+Unlock the OS keyring when prompted. For headless systems without a keyring, select
+`file` explicitly before saving connections. There is no automatic security downgrade.
+A failed automatic migration from a legacy file store can be cancelled with
+`sshmanager set security.keyStorage file`. A keyring-only installation must regain
+access to its original keyring key before moving to file storage.
+
+Interrupted migrations and restores resume on the next credential operation. Failed
+source cleanup is reported on stderr and retried while the committed backend remains
+usable. `doctor` reports the active backend and pending migration without changing
+keys or connection data. If a restore fails before its commit checkpoint, selecting
+the original storage mode cancels the pending restore and preserves the original data.
+After the checkpoint, recovery completes the committed restore.
+
+Do not delete `key-storage.yaml`: it identifies this installation's keyring entry and
+contains recovery state. A missing key for existing encrypted data is an error; the
+application will not create a replacement. Restore the original key and state, or
+restore a recovery backup into a fresh installation. Backups/exports retain their
+existing plaintext format and must be protected accordingly. They do not include
+the encryption key or installation-specific keyring/recovery state.
+
+Before using an older SSH Manager binary, switch to `file` and stop all running
+instances. Remove the persistent `conn.lock` file once no process uses it; older
+versions used its presence as a lock, whereas this version uses OS locking.
 
 ## Connection Fields
 
@@ -293,9 +349,11 @@ SSH Manager stores files under:
 Files:
 
 - `conn` (encrypted connection file)
-- `conn.lock` (temporary lock file during write operations)
-- `secret.key` (either raw AES-256 key bytes or passphrase metadata, file mode `0600`)
+- `conn.lock` (persistent OS lock file; its presence does not mean a lock is held)
+- `secret.key` (file mode only: raw AES-256 key bytes or passphrase metadata, file mode `0600`)
 - `config.yaml` (configuration)
+- `key-storage.yaml` (store identifier, key fingerprint, active backend, nonsecret passphrase metadata, and migration journal; mode `0600`)
+- `conn.restore-pending` (encrypted staging file during recoverable restore; removed after commit)
 
 ### Migrating from older connection files
 
@@ -307,7 +365,8 @@ existing aliases/fields are preserved.
 
 ## Optional Master Passphrase
 
-You can enable passphrase-derived encryption keys by setting:
+For new installations using `security.keyStorage: file`, you can enable
+passphrase-derived encryption keys by setting:
 
 ```bash
 export SSHMANAGER_MASTER_PASSPHRASE='your-strong-passphrase'
@@ -318,6 +377,13 @@ Behavior:
 - If `secret.key` does not exist and the env var is set, SSH Manager stores passphrase KDF metadata in `secret.key` and derives the encryption key from your passphrase.
 - If `secret.key` was created in passphrase mode, the same env var must be set on later runs.
 - If the env var is not set, SSH Manager uses legacy raw key-file mode.
+
+In keyring mode, the OS keyring protects the stored encryption key; this environment
+variable does not initialize passphrase encryption. Migrating an existing passphrase
+file requires its original passphrase. The nonsecret salt/KDF metadata is retained
+in `key-storage.yaml`, so switching back to file mode requires the matching passphrase
+and restores the original protection. Ordinary keyring use does not need that
+passphrase. Raw-key installations switch back to a raw key file.
 
 ## Development
 
@@ -331,11 +397,12 @@ make lint
 
 - Connection data is encrypted at rest using AES-GCM.
 - Key files are validated and stored with restrictive permissions.
+- OS keyring mode avoids storing the raw encryption key alongside encrypted connections.
 - Password-mode connections pass passwords to `sshpass` via environment variable (`SSHPASS`) instead of CLI args.
 - Key/agent modes use OpenSSH directly (no `sshpass` dependency at runtime).
 - Optional master passphrase mode derives encryption keys from `SSHMANAGER_MASTER_PASSPHRASE`.
 - State file writes use atomic temp-write + rename flow.
-- Connection mutations are guarded by a lock file to reduce concurrent update races.
+- Connection operations, migration, and cleanup share an OS-backed process lock.
 - Secure deletion is best-effort and may not provide full guarantees on all filesystems.
 - SSH keys/agent are preferred over password authentication when possible.
 

@@ -5,11 +5,12 @@ import (
 	"fmt"
 	"io"
 	"os"
+	"path/filepath"
 	"strings"
 
 	"github.com/emirhangumus/sshmanager/internal/completion"
-	"github.com/emirhangumus/sshmanager/internal/config"
 	"github.com/emirhangumus/sshmanager/internal/store"
+	"github.com/emirhangumus/sshmanager/internal/ui/progress"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
 )
 
@@ -70,9 +71,10 @@ Transfer / Recovery Commands:
 
 Utility Commands:
   clean
-        Reset all saved SSH connections and key file
+        Reset all saved SSH connections and owned file/keyring secrets
   set <config-name> <config-value>
         Set SSHManager configuration
+        security.keyStorage keyring|file (default: keyring; migrates saved credentials)
   version
         Show build version
   complete [prefix]
@@ -116,7 +118,13 @@ func HandleSet(configFilePath string, args []string) error {
 	if len(args) < 2 {
 		return errors.New("not enough arguments for set; expected: sshmanager set <config-name> <config-value>")
 	}
-	return config.SetConfig(configFilePath, args[0], args[1])
+	dir := filepath.Dir(configFilePath)
+	if args[0] == "security.keyStorage" {
+		return progress.Run(os.Stderr, func(report func(string)) error {
+			return store.NewConnectionStore(filepath.Join(dir, "conn"), filepath.Join(dir, "secret.key"), store.WithProgress(report)).SetConfiguration(args[0], args[1])
+		})
+	}
+	return store.NewConnectionStore(filepath.Join(dir, "conn"), filepath.Join(dir, "secret.key")).SetConfiguration(args[0], args[1])
 }
 
 func HandleComplete(connectionFilePath, secretKeyFilePath string, args []string) error {
@@ -203,13 +211,6 @@ func printCompletionCandidates(connectionFilePath, secretKeyFilePath, prefix str
 		}
 		return err
 	}
-	if _, err := os.Stat(secretKeyFilePath); err != nil {
-		if os.IsNotExist(err) {
-			return nil
-		}
-		return err
-	}
-
 	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath)
 	connFile, err := connStore.Load()
 	if err != nil {

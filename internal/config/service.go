@@ -23,10 +23,24 @@ func LoadConfig(configFilePath string) (SSHManagerConfig, error) {
 	if err := storage.ReadYAMLFile(configFilePath, &cfg); err != nil {
 		return SSHManagerConfig{}, fmt.Errorf("failed to load configuration: %w", err)
 	}
+	if err := Validate(cfg); err != nil {
+		return SSHManagerConfig{}, err
+	}
 	return cfg, nil
 }
 
+// Validate rejects unsupported key storage backends before changing persistence.
+func Validate(cfg SSHManagerConfig) error {
+	if cfg.Security.KeyStorage != "keyring" && cfg.Security.KeyStorage != "file" {
+		return fmt.Errorf("invalid security.keyStorage %q: expected keyring or file", cfg.Security.KeyStorage)
+	}
+	return nil
+}
+
 func SaveConfig(configFilePath string, cfg SSHManagerConfig) error {
+	if err := Validate(cfg); err != nil {
+		return err
+	}
 	if err := storage.WriteYAMLFile(configFilePath, cfg, 0o600); err != nil {
 		return fmt.Errorf("failed to save configuration: %w", err)
 	}

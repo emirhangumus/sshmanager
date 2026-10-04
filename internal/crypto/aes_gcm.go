@@ -12,6 +12,8 @@ import (
 	"os"
 	"path/filepath"
 	"strings"
+
+	"github.com/emirhangumus/sshmanager/internal/storage"
 )
 
 const (
@@ -50,14 +52,24 @@ func LoadKey(filePath string) ([]byte, error) {
 		return createKeyFile(filePath)
 	}
 
+	return LoadExistingKey(filePath)
+}
+
+// LoadExistingKey never creates a key. Existing ciphertext must not receive a replacement key.
+func LoadExistingKey(filePath string) ([]byte, error) {
 	key, err := os.ReadFile(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key file: %w", err)
 	}
-	if len(key) != keySize {
-		return loadPassphraseKey(key)
+	return DecodeKeyFile(key)
+}
+
+// DecodeKeyFile resolves raw keys or passphrase metadata without writing files.
+func DecodeKeyFile(data []byte) ([]byte, error) {
+	if len(data) == keySize {
+		return data, nil
 	}
-	return key, nil
+	return loadPassphraseKey(data)
 }
 
 func createKeyFile(filePath string) ([]byte, error) {
@@ -71,7 +83,7 @@ func createKeyFile(filePath string) ([]byte, error) {
 		if err != nil {
 			return nil, fmt.Errorf("failed to generate key: %w", err)
 		}
-		if err := os.WriteFile(filePath, key, 0o600); err != nil {
+		if err := storage.WriteFileAtomic(filePath, key, 0o600); err != nil {
 			return nil, fmt.Errorf("failed to write key file: %w", err)
 		}
 		return key, nil
@@ -102,23 +114,19 @@ func createPassphraseKeyFile(filePath, passphrase string) ([]byte, error) {
 	if err != nil {
 		return nil, fmt.Errorf("failed to encode passphrase key metadata: %w", err)
 	}
-	if err := os.WriteFile(filePath, data, 0o600); err != nil {
+	if err := storage.WriteFileAtomic(filePath, data, 0o600); err != nil {
 		return nil, fmt.Errorf("failed to write key file: %w", err)
 	}
 	return key, nil
 }
 
 func loadPassphraseKey(data []byte) ([]byte, error) {
+	if err := ValidatePassphraseMetadata(data); err != nil {
+		return nil, err
+	}
 	var meta passphraseKeyFile
 	if err := json.Unmarshal(data, &meta); err != nil {
 		return nil, fmt.Errorf("invalid key file format: expected %d raw bytes or passphrase metadata", keySize)
-	}
-
-	if meta.Mode != passphraseKeyFileMode {
-		return nil, fmt.Errorf("unsupported key file mode: %q", meta.Mode)
-	}
-	if meta.Version != passphraseKeyFileV1 {
-		return nil, fmt.Errorf("unsupported key file version: %d", meta.Version)
 	}
 
 	passphrase := strings.TrimSpace(os.Getenv(passphraseEnvVar))
@@ -131,16 +139,27 @@ func loadPassphraseKey(data []byte) ([]byte, error) {
 		return nil, fmt.Errorf("invalid key file salt: %w", err)
 	}
 
-	iterations := meta.Iterations
-	if iterations <= 0 {
-		iterations = passphraseIterationsV1
-	}
-
-	key, err := derivePassphraseKey(passphrase, salt, iterations)
+	key, err := derivePassphraseKey(passphrase, salt, meta.Iterations)
 	if err != nil {
 		return nil, err
 	}
 	return key, nil
+}
+
+// ValidatePassphraseMetadata validates nonsecret metadata without needing a passphrase.
+func ValidatePassphraseMetadata(data []byte) error {
+	var meta passphraseKeyFile
+	if err := json.Unmarshal(data, &meta); err != nil {
+		return fmt.Errorf("invalid key file format: %w", err)
+	}
+	if meta.Mode != passphraseKeyFileMode || meta.Version != passphraseKeyFileV1 || meta.KDF != passphraseKeyFileKDF || meta.Iterations <= 0 {
+		return fmt.Errorf("invalid passphrase KDF metadata")
+	}
+	salt, err := base64.StdEncoding.DecodeString(meta.Salt)
+	if err != nil || len(salt) != passphraseSalt {
+		return fmt.Errorf("invalid passphrase salt")
+	}
+	return nil
 }
 
 func derivePassphraseKey(passphrase string, salt []byte, iterations int) ([]byte, error) {
