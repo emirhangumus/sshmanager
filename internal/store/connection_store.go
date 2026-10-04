@@ -7,30 +7,46 @@ import (
 	"strings"
 	"time"
 
-	cryptoutil "github.com/emirhangumus/sshmanager/internal/crypto"
 	"github.com/emirhangumus/sshmanager/internal/model"
 	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/gofrs/flock"
 )
 
 type ConnectionStore struct {
 	connectionFilePath string
 	secretKeyFilePath  string
+	keyring            Keyring
+	configFilePath     string
+	progress           func(string)
 }
 
 var (
 	connectionLockTimeout       = 5 * time.Second
 	connectionLockRetryInterval = 50 * time.Millisecond
-	connectionLockStaleAfter    = 2 * time.Minute
 )
 
-func NewConnectionStore(connectionFilePath, secretKeyFilePath string) *ConnectionStore {
-	return &ConnectionStore{
+// NewConnectionStore coordinates encrypted data and its configured key backend.
+func NewConnectionStore(connectionFilePath, secretKeyFilePath string, options ...func(*ConnectionStore)) *ConnectionStore {
+	s := &ConnectionStore{
 		connectionFilePath: connectionFilePath,
 		secretKeyFilePath:  secretKeyFilePath,
+		keyring:            systemKeyring{},
 	}
+	for _, option := range options {
+		option(s)
+	}
+	return s
 }
 
 func (s *ConnectionStore) InitializeIfEmpty() error {
+	unlock, err := s.acquireMutationLock()
+	if err != nil {
+		return err
+	}
+	defer unlock()
+	if _, err := s.keyWithoutLock(); err != nil {
+		return err
+	}
 	isEmpty, err := storage.IsFileEmpty(s.connectionFilePath)
 	if err != nil {
 		return err
@@ -38,11 +54,16 @@ func (s *ConnectionStore) InitializeIfEmpty() error {
 	if !isEmpty {
 		return nil
 	}
-	return s.Save(model.NewConnectionFile())
+	return s.saveWithoutLock(model.NewConnectionFile())
 }
 
 func (s *ConnectionStore) Load() (model.ConnectionFile, error) {
-	return s.load(false)
+	unlock, err := s.acquireMutationLock()
+	if err != nil {
+		return model.ConnectionFile{}, err
+	}
+	defer unlock()
+	return s.loadWithoutLock()
 }
 
 func (s *ConnectionStore) Save(connFile model.ConnectionFile) error {
@@ -75,16 +96,15 @@ func (s *ConnectionStore) Update(mutator func(*model.ConnectionFile) error) erro
 }
 
 func (s *ConnectionStore) loadWithoutLock() (model.ConnectionFile, error) {
-	return s.load(true)
-}
-
-func (s *ConnectionStore) load(lockHeld bool) (model.ConnectionFile, error) {
-	key, err := cryptoutil.LoadKey(s.secretKeyFilePath)
+	key, err := s.keyWithoutLock()
 	if err != nil {
 		return model.ConnectionFile{}, err
 	}
 
 	content, err := decryptAndReadFile(s.connectionFilePath, key)
+	if os.IsNotExist(err) {
+		content, err = "", nil
+	}
 	if err != nil {
 		return model.ConnectionFile{}, err
 	}
@@ -96,14 +116,8 @@ func (s *ConnectionStore) load(lockHeld bool) (model.ConnectionFile, error) {
 
 	changed := connFile.EnsureIDs()
 	if changed {
-		if lockHeld {
-			if err := s.saveWithoutLock(connFile); err != nil {
-				return model.ConnectionFile{}, err
-			}
-		} else {
-			if err := s.Save(connFile); err != nil {
-				return model.ConnectionFile{}, err
-			}
+		if err := s.saveWithoutLock(connFile); err != nil {
+			return model.ConnectionFile{}, err
 		}
 	}
 
@@ -116,8 +130,11 @@ func (s *ConnectionStore) saveWithoutLock(connFile model.ConnectionFile) error {
 	}
 	connFile.EnsureIDs()
 
-	key, err := cryptoutil.LoadKey(s.secretKeyFilePath)
+	key, err := s.keyWithoutLock()
 	if err != nil {
+		return err
+	}
+	if err := s.verifyKey(key); err != nil {
 		return err
 	}
 
@@ -140,36 +157,23 @@ func (s *ConnectionStore) acquireMutationLock() (func(), error) {
 	}
 
 	deadline := time.Now().Add(connectionLockTimeout)
+	lockFile := flock.New(lockPath, flock.SetPermissions(0o600))
 	for {
-		lockFile, err := os.OpenFile(lockPath, os.O_CREATE|os.O_EXCL|os.O_WRONLY, 0o600)
-		if err == nil {
-			_, _ = fmt.Fprintf(lockFile, "pid=%d\ncreated=%s\n", os.Getpid(), time.Now().UTC().Format(time.RFC3339Nano))
+		locked, err := lockFile.TryLock()
+		if err != nil {
 			_ = lockFile.Close()
-			return func() { _ = os.Remove(lockPath) }, nil
-		}
-
-		if !os.IsExist(err) {
 			return nil, fmt.Errorf("failed to acquire mutation lock: %w", err)
 		}
-
-		if s.shouldBreakStaleLock(lockPath) {
-			_ = os.Remove(lockPath)
-			continue
+		if locked {
+			return func() { _ = lockFile.Close() }, nil
 		}
 
 		if time.Now().After(deadline) {
+			_ = lockFile.Close()
 			return nil, fmt.Errorf("timed out acquiring mutation lock %s", lockPath)
 		}
 		time.Sleep(connectionLockRetryInterval)
 	}
-}
-
-func (s *ConnectionStore) shouldBreakStaleLock(lockPath string) bool {
-	info, err := os.Stat(lockPath)
-	if err != nil {
-		return false
-	}
-	return time.Since(info.ModTime()) > connectionLockStaleAfter
 }
 
 func parseConnectionFile(content string) (model.ConnectionFile, error) {

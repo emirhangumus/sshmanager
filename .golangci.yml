@@ -1,3 +1,5 @@
+version: "2"
+
 run:
   timeout: 5m
 
@@ -10,4 +12,25 @@ linters:
     - errcheck
     - gosec
     - revive
+  exclusions:
+    generated: lax
+    presets:
+      - comments
+      - common-false-positives
+      - legacy
+      - std-error-handling
+    rules:
+      # Test fixtures intentionally contain and serialize sample credentials.
+      - path: _test\.go$
+        linters:
+          - gosec
+        text: 'G101:|G117:'
+      # These are user-facing labels, not hardcoded credentials.
+      - path: internal/ui/prompt/messages\.go$
+        linters:
+          - gosec
+        text: 'G101:'
+
+formatters:
+  enable:
     - gofmt

@@ -22,7 +22,7 @@ func TestSetupCreatesInitialState(t *testing.T) {
 
 	assertFileExists(t, connPath)
 	assertFileExists(t, configPath)
-	assertFileExists(t, keyPath)
+	assertFileExists(t, filepath.Join(filepath.Dir(connPath), "key-storage.yaml"))
 
 	cfg, err := config.LoadConfig(configPath)
 	if err != nil {
@@ -44,12 +44,8 @@ func TestSetupCreatesInitialState(t *testing.T) {
 		t.Fatalf("expected no initial connections, got %d", len(connFile.Connections))
 	}
 
-	keyData, err := os.ReadFile(keyPath)
-	if err != nil {
-		t.Fatalf("failed to read key file: %v", err)
-	}
-	if len(keyData) != 32 {
-		t.Fatalf("expected 32-byte key, got %d bytes", len(keyData))
+	if _, err := os.Stat(keyPath); !os.IsNotExist(err) {
+		t.Fatalf("keyring mode must not write a local key: %v", err)
 	}
 }
 

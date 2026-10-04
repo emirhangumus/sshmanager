@@ -4,13 +4,13 @@ import (
 	"fmt"
 	"strings"
 
-	"github.com/emirhangumus/sshmanager/internal/storage"
+	"github.com/emirhangumus/sshmanager/internal/store"
 	prompttext "github.com/emirhangumus/sshmanager/internal/ui/prompt"
 )
 
 func CleanSSHFiles(connectionFilePath, secretKeyFilePath string) error {
 	confirmation, err := prompttext.InputPrompt(
-		"Are you sure you want to remove all SSH connections and key files? This action cannot be undone. Type 'yes' to confirm.",
+		"Are you sure you want to remove all SSH connections and their file/keyring secrets? This action cannot be undone. Type 'yes' to confirm.",
 		"",
 		false,
 		nil,
@@ -20,10 +20,7 @@ func CleanSSHFiles(connectionFilePath, secretKeyFilePath string) error {
 		return nil
 	}
 
-	if err := storage.SecureDelete(connectionFilePath); err != nil {
-		return err
-	}
-	if err := storage.SecureDelete(secretKeyFilePath); err != nil {
+	if err := store.NewConnectionStore(connectionFilePath, secretKeyFilePath).Clean(); err != nil {
 		return err
 	}
 

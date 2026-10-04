@@ -116,7 +116,7 @@ func handleList(connectionFilePath, secretKeyFilePath string, args []string, out
 	if *jsonOutput {
 		enc := json.NewEncoder(out)
 		enc.SetIndent("", "  ")
-		return enc.Encode(items)
+		return enc.Encode(items) // #nosec G117 -- passwords are omitted unless the user explicitly requests -p.
 	}
 
 	if strings.TrimSpace(*field) != "" {

@@ -41,19 +41,19 @@ func TestRunWithVersionSubcommand(t *testing.T) {
 	}
 }
 
-func TestRunLegacyVersionFlagStillWorks(t *testing.T) {
-	home := t.TempDir()
-	setHomeEnv(t, home)
-
-	output := captureStdout(t, func() {
-		err := Run([]string{"sshmanager", "-version"}, BuildInfo{Version: "v1.2.3"})
-		if err != nil {
-			t.Fatalf("Run returned error: %v", err)
-		}
-	})
-
-	if !strings.Contains(output, "v1.2.3") {
-		t.Fatalf("expected version output, got %q", output)
+func TestRunRejectsLegacyDashCommandsWithoutInitializingStorage(t *testing.T) {
+	for _, command := range []string{"-clean", "-set", "-complete", "-completion", "-version"} {
+		t.Run(command, func(t *testing.T) {
+			home := t.TempDir()
+			setHomeEnv(t, home)
+			err := Run([]string{"sshmanager", command}, BuildInfo{})
+			if err == nil || !strings.Contains(err.Error(), "unknown option") {
+				t.Fatalf("expected unknown option, got %v", err)
+			}
+			if _, err := os.Stat(filepath.Join(home, ".sshmanager")); !os.IsNotExist(err) {
+				t.Fatalf("rejected command initialized storage: %v", err)
+			}
+		})
 	}
 }
 

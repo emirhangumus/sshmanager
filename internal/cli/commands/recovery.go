@@ -14,7 +14,6 @@ import (
 	"time"
 
 	"github.com/emirhangumus/sshmanager/internal/config"
-	cryptoutil "github.com/emirhangumus/sshmanager/internal/crypto"
 	"github.com/emirhangumus/sshmanager/internal/model"
 	"github.com/emirhangumus/sshmanager/internal/storage"
 	"github.com/emirhangumus/sshmanager/internal/store"
@@ -54,7 +53,7 @@ func handleBackup(connectionFilePath, secretKeyFilePath, configFilePath string, 
 		return errors.New("missing required --out path")
 	}
 
-	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath)
+	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath, store.WithConfigPath(configFilePath))
 	connFile, err := connStore.Load()
 	if err != nil {
 		return err
@@ -121,22 +120,26 @@ func handleRestore(connectionFilePath, secretKeyFilePath, configFilePath string,
 		return err
 	}
 
-	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath)
+	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath, store.WithConfigPath(configFilePath))
 	modeNorm := strings.ToLower(strings.TrimSpace(*mode))
+	var restoredConfig *config.SSHManagerConfig
+	if *withConfig {
+		restoredConfig = snapshot.Config
+	}
 	switch modeNorm {
 	case importModeMerge:
-		err = connStore.Update(func(connFile *model.ConnectionFile) error {
+		err = connStore.Restore(func(connFile *model.ConnectionFile) error {
 			return mergeImportedConnections(connFile, snapshot.ConnectionFile.Connections)
-		})
+		}, restoredConfig)
 	case importModeReplace:
-		err = connStore.Update(func(connFile *model.ConnectionFile) error {
+		err = connStore.Restore(func(connFile *model.ConnectionFile) error {
 			replacement, buildErr := buildConnectionFile(snapshot.ConnectionFile.Connections)
 			if buildErr != nil {
 				return buildErr
 			}
 			*connFile = replacement
 			return nil
-		})
+		}, restoredConfig)
 	default:
 		return fmt.Errorf("unknown restore mode %q (use merge or replace)", modeNorm)
 	}
@@ -144,13 +147,7 @@ func handleRestore(connectionFilePath, secretKeyFilePath, configFilePath string,
 		return err
 	}
 
-	configRestored := false
-	if *withConfig && snapshot.Config != nil {
-		if err := config.SaveConfig(configFilePath, *snapshot.Config); err != nil {
-			return err
-		}
-		configRestored = true
-	}
+	configRestored := restoredConfig != nil
 
 	_, _ = fmt.Fprintf(out, "Restore completed from %s using %s mode (%d connections, config_restored=%t)\n",
 		source,
@@ -330,11 +327,10 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 
 	configExists := checkFile("config file", configFilePath)
 	connectionExists := checkFile("connection file", connectionFilePath)
-	secretKeyExists := checkFile("secret key file", secretKeyFilePath)
 
 	lockPath := connectionFilePath + ".lock"
 	if _, err := os.Stat(lockPath); err == nil {
-		addCheck("connection lock file", "warn", fmt.Sprintf("lock file exists: %s", lockPath))
+		addCheck("connection lock file", "ok", fmt.Sprintf("persistent OS lock file: %s (existence does not indicate a held lock)", lockPath))
 	} else if os.IsNotExist(err) {
 		addCheck("connection lock file", "ok", "no active lock file")
 	} else {
@@ -370,35 +366,6 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 		}
 	}
 
-	if keyData, err := os.ReadFile(secretKeyFilePath); err != nil {
-		addCheck("key file format", "error", fmt.Sprintf("failed to read key file: %v", err))
-	} else {
-		switch len(keyData) {
-		case 32:
-			addCheck("key file format", "ok", "raw AES-256 key mode")
-		default:
-			var meta map[string]any
-			if err := json.Unmarshal(keyData, &meta); err != nil {
-				addCheck("key file format", "error", "unrecognized key format")
-			} else {
-				mode, _ := meta["mode"].(string)
-				if strings.TrimSpace(mode) == "" {
-					addCheck("key file format", "warn", "key metadata mode missing")
-				} else {
-					addCheck("key file format", "ok", fmt.Sprintf("metadata mode: %s", mode))
-				}
-			}
-		}
-	}
-
-	if !secretKeyExists {
-		addCheck("key derivation", "error", "skipped: secret key file is missing")
-	} else if _, err := cryptoutil.LoadKey(secretKeyFilePath); err != nil {
-		addCheck("key derivation", "error", err.Error())
-	} else {
-		addCheck("key derivation", "ok", "encryption key can be loaded")
-	}
-
 	if !configExists {
 		addCheck("config parse", "error", "skipped: config file is missing")
 	} else {
@@ -410,11 +377,18 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 		}
 	}
 
-	if !connectionExists || !secretKeyExists {
+	if !connectionExists {
 		addCheck("connection data load", "error", "skipped: required connection/key file is missing")
 	} else {
-		connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath)
-		connFile, connErr := connStore.Load()
+		connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath, store.WithConfigPath(configFilePath))
+		connFile, backend, pending, connErr := connStore.Inspect()
+		if backend == "file" {
+			checkFile("secret key file", secretKeyFilePath)
+		}
+		addCheck("key storage", "ok", fmt.Sprintf("active backend: %s", backend))
+		if pending {
+			addCheck("storage migration", "warn", "migration or cleanup pending; normal credential operations resume it")
+		}
 		if connErr != nil {
 			addCheck("connection data load", "error", connErr.Error())
 		} else {
