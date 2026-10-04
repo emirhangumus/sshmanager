@@ -88,26 +88,8 @@ Utility Commands:
 
 Notes:
   - Running without a command opens the interactive menu.
-  - Using a single non-command token tries alias connect (e.g. sshmanager prod).
-  - Legacy dash commands (-clean, -set, -version, -complete, -completion) remain supported.`
+  - Using a single non-command token tries alias connect (e.g. sshmanager prod).`
 	_, _ = fmt.Fprintln(out, usage)
-}
-
-func MapLegacyDashCommand(token string) (string, bool) {
-	switch strings.TrimSpace(token) {
-	case "-clean":
-		return "clean", true
-	case "-complete":
-		return "complete", true
-	case "-completion":
-		return "completion", true
-	case "-set":
-		return "set", true
-	case "-version":
-		return "version", true
-	default:
-		return "", false
-	}
 }
 
 func HandleVersion(version string, out io.Writer) {

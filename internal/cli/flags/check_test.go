@@ -142,29 +142,6 @@ func TestHandleCompletePrintsMatchingAliases(t *testing.T) {
 	}
 }
 
-func TestMapLegacyDashCommand(t *testing.T) {
-	tests := map[string]string{
-		"-clean":      "clean",
-		"-complete":   "complete",
-		"-completion": "completion",
-		"-set":        "set",
-		"-version":    "version",
-	}
-	for in, want := range tests {
-		got, ok := MapLegacyDashCommand(in)
-		if !ok {
-			t.Fatalf("expected %q to map to %q", in, want)
-		}
-		if got != want {
-			t.Fatalf("unexpected mapping for %q: got %q want %q", in, got, want)
-		}
-	}
-
-	if _, ok := MapLegacyDashCommand("-unknown"); ok {
-		t.Fatal("unexpected mapping for unknown legacy option")
-	}
-}
-
 func captureStdout(t *testing.T, fn func()) string {
 	t.Helper()
 
