@@ -31,9 +31,11 @@ Before opening a PR:
 
 ## Security-sensitive changes
 
-This tool stores and uses SSH credentials. See the **Security invariants**
-section in `CLAUDE.md` before touching `internal/crypto`, `internal/storage`,
-`internal/store`, or anything that builds `ssh`/`sshpass` invocations in
-`internal/cli/commands/connect.go`. If you're changing how secrets are
-stored, transmitted to subprocesses, or validated, call that out explicitly
-in your PR description.
+This tool stores and uses SSH credentials. Read the [security policy and threat
+model](SECURITY.md), [storage format and recovery](docs/storage-format.md), and
+[execution/backup boundaries](docs/security-boundaries.md) before changing
+`internal/crypto`, `internal/storage`, `internal/store`, or SSH/SCP command
+construction in `internal/cli/commands`. See [architecture](docs/architecture.md)
+for package responsibilities. If you're changing how secrets are stored,
+transmitted to subprocesses, or validated, call that out explicitly in your PR
+description.
