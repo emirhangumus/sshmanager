@@ -75,7 +75,6 @@ func TestHandleRestoreReplaceRestoresConnectionsAndConfig(t *testing.T) {
 	cfgPath := filepath.Join(t.TempDir(), "config.yaml")
 	backupCfg := config.Default()
 	backupCfg.Behaviour.ContinueAfterSSHExit = true
-	backupCfg.Behaviour.ShowCredentialsOnConnect = true
 	if err := config.SaveConfig(cfgPath, backupCfg); err != nil {
 		t.Fatalf("SaveConfig(backupCfg) failed: %v", err)
 	}
@@ -101,7 +100,6 @@ func TestHandleRestoreReplaceRestoresConnectionsAndConfig(t *testing.T) {
 
 	driftCfg := config.Default()
 	driftCfg.Behaviour.ContinueAfterSSHExit = false
-	driftCfg.Behaviour.ShowCredentialsOnConnect = false
 	if err := config.SaveConfig(cfgPath, driftCfg); err != nil {
 		t.Fatalf("SaveConfig(driftCfg) failed: %v", err)
 	}

@@ -60,12 +60,6 @@ func SetConfig(configFilePath, configName, configValue string) error {
 			return err
 		}
 		cfg.Behaviour.ContinueAfterSSHExit = v
-	case "behaviour.showCredentialsOnConnect":
-		v, err := parseBoolValue(configName, configValue)
-		if err != nil {
-			return err
-		}
-		cfg.Behaviour.ShowCredentialsOnConnect = v
 	default:
 		return errors.New("unknown configuration name: " + configName)
 	}

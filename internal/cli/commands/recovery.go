@@ -360,6 +360,10 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 	}
 
 	checkFile := func(name, path string) bool {
+		if err := storage.ValidateRegularPath(path); err != nil {
+			addCheck(name, "error", err.Error())
+			return false
+		}
 		info, err := os.Stat(path)
 		if err != nil {
 			if os.IsNotExist(err) {
@@ -454,6 +458,9 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 			aliasSeen := map[string]struct{}{}
 			invalidCount := 0
 			for _, conn := range connFile.Connections {
+				for _, check := range connectionSecurityChecks(conn) {
+					addCheck(check.Name, check.Status, check.Detail)
+				}
 				if _, err := normalizeImportedConnection(conn); err != nil {
 					invalidCount++
 				}

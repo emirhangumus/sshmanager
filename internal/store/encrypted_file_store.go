@@ -2,7 +2,6 @@ package store
 
 import (
 	"fmt"
-	"os"
 
 	cryptoutil "github.com/emirhangumus/sshmanager/v2/internal/crypto"
 	"github.com/emirhangumus/sshmanager/v2/internal/storage"
@@ -21,7 +20,7 @@ func encryptAndStoreFile(data, filePath string, key []byte) error {
 }
 
 func decryptAndReadFile(filePath string, key []byte) (string, error) {
-	encryptedData, err := os.ReadFile(filePath)
+	encryptedData, err := storage.ReadFileRegular(filePath)
 	if err != nil {
 		return "", err
 	}

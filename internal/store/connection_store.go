@@ -7,9 +7,11 @@ import (
 	"strings"
 	"time"
 
+	cryptoutil "github.com/emirhangumus/sshmanager/v2/internal/crypto"
 	"github.com/emirhangumus/sshmanager/v2/internal/model"
 	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 	"github.com/gofrs/flock"
+	"gopkg.in/yaml.v3"
 )
 
 type ConnectionStore struct {
@@ -109,12 +111,19 @@ func (s *ConnectionStore) loadWithoutLock() (model.ConnectionFile, error) {
 		return model.ConnectionFile{}, err
 	}
 
-	connFile, err := parseConnectionFile(content)
+	connFile, legacySchema, err := parseConnectionFileWithMigration(content)
 	if err != nil {
 		return model.ConnectionFile{}, err
 	}
 
-	changed := connFile.EnsureIDs()
+	changed := connFile.EnsureIDs() || legacySchema
+	if content != "" {
+		data, readErr := storage.ReadFileRegular(s.connectionFilePath)
+		if readErr != nil {
+			return model.ConnectionFile{}, readErr
+		}
+		changed = changed || !cryptoutil.IsVersionedStore(data)
+	}
 	if changed {
 		if err := s.saveWithoutLock(connFile); err != nil {
 			return model.ConnectionFile{}, err
@@ -152,10 +161,13 @@ func (s *ConnectionStore) saveWithoutLock(connFile model.ConnectionFile) error {
 func (s *ConnectionStore) acquireMutationLock() (func(), error) {
 	lockPath := s.connectionFilePath + ".lock"
 	lockDir := filepath.Dir(lockPath)
-	if err := os.MkdirAll(lockDir, 0o700); err != nil {
+	if err := os.MkdirAll(lockDir, 0o700); err != nil { //nolint:gosec // Lock directory derives from the explicitly configured local datastore, not a remote profile.
 		return nil, fmt.Errorf("failed to create lock directory: %w", err)
 	}
 
+	if err := storage.ValidateRegularPath(lockPath); err != nil {
+		return nil, err
+	}
 	deadline := time.Now().Add(connectionLockTimeout)
 	lockFile := flock.New(lockPath, flock.SetPermissions(0o600))
 	for {
@@ -177,29 +189,58 @@ func (s *ConnectionStore) acquireMutationLock() (func(), error) {
 }
 
 func parseConnectionFile(content string) (model.ConnectionFile, error) {
+	file, _, err := parseConnectionFileWithMigration(content)
+	return file, err
+}
+
+func parseConnectionFileWithMigration(content string) (model.ConnectionFile, bool, error) {
 	trimmed := strings.TrimSpace(content)
 	if trimmed == "" {
-		return model.NewConnectionFile(), nil
+		return model.NewConnectionFile(), false, nil
 	}
-
+	if len(content) > cryptoutil.MaxStoreSize {
+		return model.ConnectionFile{}, false, fmt.Errorf("connection schema exceeds size limit")
+	}
+	var document yaml.Node
+	if err := yaml.Unmarshal([]byte(content), &document); err != nil {
+		return model.ConnectionFile{}, false, fmt.Errorf("failed to parse connection file: %w", err)
+	}
+	if len(document.Content) != 1 {
+		return model.ConnectionFile{}, false, fmt.Errorf("invalid connection document")
+	}
+	root := document.Content[0]
+	if root.Kind == yaml.SequenceNode {
+		var legacy []model.SSHConnection
+		if err := root.Decode(&legacy); err != nil {
+			return model.ConnectionFile{}, false, err
+		}
+		return model.ConnectionFile{Version: model.CurrentConnectionFileVersion, Connections: legacy}, true, nil
+	}
+	if root.Kind != yaml.MappingNode {
+		return model.ConnectionFile{}, false, fmt.Errorf("unsupported connection schema")
+	}
+	recognized := false
+	for i := 0; i < len(root.Content); i += 2 {
+		if root.Content[i].Value == "connections" || root.Content[i].Value == "version" {
+			recognized = true
+		}
+	}
+	if !recognized {
+		return model.ConnectionFile{}, false, fmt.Errorf("missing connection schema fields")
+	}
 	var schema model.ConnectionFile
-	if err := fromYAMLString(content, &schema); err == nil {
-		if strings.TrimSpace(schema.Version) == "" {
-			schema.Version = model.CurrentConnectionFileVersion
-		}
-		if schema.Connections == nil {
-			schema.Connections = []model.SSHConnection{}
-		}
-		return schema, nil
+	if err := root.Decode(&schema); err != nil {
+		return model.ConnectionFile{}, false, err
 	}
-
-	var legacy []model.SSHConnection
-	if err := fromYAMLString(content, &legacy); err == nil {
-		return model.ConnectionFile{
-			Version:     model.CurrentConnectionFileVersion,
-			Connections: legacy,
-		}, nil
+	legacy := strings.TrimSpace(schema.Version) == ""
+	if legacy {
+		schema.Version = model.CurrentConnectionFileVersion
 	}
-
-	return model.ConnectionFile{}, fmt.Errorf("failed to parse connection file: unsupported YAML schema")
+	if schema.Version != model.CurrentConnectionFileVersion {
+		return model.ConnectionFile{}, false, fmt.Errorf("unsupported connection schema version %q", schema.Version)
+	}
+	if schema.Connections == nil {
+		schema.Connections = []model.SSHConnection{}
+	}
+	return schema, legacy, nil
 }

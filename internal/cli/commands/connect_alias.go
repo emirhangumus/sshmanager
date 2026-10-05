@@ -18,7 +18,7 @@ func FindAndConnectByID(connectionFilePath, secretKeyFilePath, configFilePath, i
 }
 
 func findAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, alias, id string) error {
-	cfg, err := config.LoadConfig(configFilePath)
+	_, err := config.LoadConfig(configFilePath)
 	if err != nil {
 		return err
 	}
@@ -40,7 +40,6 @@ func findAndConnect(connectionFilePath, secretKeyFilePath, configFilePath, alias
 	}
 
 	fmt.Printf("Connecting to %s@%s...\n", conn.Username, conn.Host)
-	printCredentialsIfEnabled(conn, &cfg)
 	if err := connect(conn); err != nil {
 		fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.ConnectionToXFailedX+"\n", fmt.Sprintf("%s@%s", conn.Username, conn.Host), err)
 		return nil

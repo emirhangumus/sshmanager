@@ -130,3 +130,17 @@ func TestSelectItemsIncludesGroupAndTags(t *testing.T) {
 		t.Fatalf("expected group/tags in label, got %q", got)
 	}
 }
+
+func TestAliasCollisionNamesExistingAlias(t *testing.T) {
+	cf := NewConnectionFile()
+	if err := cf.AddConnection(SSHConnection{Alias: "Production-API"}); err != nil {
+		t.Fatal(err)
+	}
+	err := cf.AddConnection(SSHConnection{Alias: "production-api"})
+	if !errors.Is(err, ErrAliasAlreadyExists) || !strings.Contains(err.Error(), `"Production-API"`) || !strings.Contains(err.Error(), `"production-api"`) {
+		t.Fatalf("collision diagnostic: %v", err)
+	}
+	if cf.Connections[0].Alias != "Production-API" {
+		t.Fatal("original case lost")
+	}
+}

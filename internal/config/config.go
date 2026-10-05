@@ -6,8 +6,7 @@ import (
 )
 
 type BehaviourConfig struct {
-	ContinueAfterSSHExit     bool `yaml:"continueAfterSSHExit"`
-	ShowCredentialsOnConnect bool `yaml:"showCredentialsOnConnect"`
+	ContinueAfterSSHExit bool `yaml:"continueAfterSSHExit"`
 }
 
 type SSHManagerConfig struct {
@@ -47,8 +46,7 @@ func Default() SSHManagerConfig {
 	return SSHManagerConfig{
 		Security: SecurityConfig{KeyStorage: "keyring"},
 		Behaviour: BehaviourConfig{
-			ContinueAfterSSHExit:     false,
-			ShowCredentialsOnConnect: false,
+			ContinueAfterSSHExit: false,
 		},
 	}
 }

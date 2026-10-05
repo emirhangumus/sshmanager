@@ -41,8 +41,8 @@ by default.
 - An accessible OS keyring for the default storage mode; headless systems can explicitly select [file storage](#configuration)
 
 Building from source also requires Go **1.24+**. The Makefile workflow requires
-`make`; its `install` target checks for `sshpass` even when you plan to use key or
-agent authentication.
+`make`; installation does not require `sshpass`. It is only required at runtime
+for password authentication.
 
 Example (Debian/Ubuntu):
 
@@ -198,6 +198,7 @@ sshmanager remove --id <connection-id> --yes
 
 ```bash
 sshmanager connect --alias prod
+sshmanager connect --alias prod --dry-run
 sshmanager connect --id <connection-id>
 ```
 
@@ -321,7 +322,6 @@ sshmanager version
 
 ```bash
 sshmanager set behaviour.continueAfterSSHExit false
-sshmanager set behaviour.showCredentialsOnConnect false
 ```
 
 - Completion candidates (used by shell completion scripts):
@@ -355,7 +355,6 @@ source ~/.bashrc
 | Key | Default | Type | Description |
 |---|---|---|---|
 | `behaviour.continueAfterSSHExit` | `false` | boolean | If `true`, return to the TUI after SSH exits. If `false`, exit the app after SSH session ends. |
-| `behaviour.showCredentialsOnConnect` | `false` | boolean | If `true`, prints username and password before opening SSH connection. |
 | `security.keyStorage` | `keyring` | `keyring` or `file` | Where the encryption key is stored. Switching migrates the existing key and preserves saved passwords. |
 
 ```yaml
@@ -408,9 +407,9 @@ restore a recovery backup into a fresh installation. Backups are passphrase-encr
 contain plaintext secrets and must be protected separately. Neither includes
 the encryption key or installation-specific keyring/recovery state.
 
-Before using an older SSH Manager binary, switch to `file` and stop all running
-instances. Remove the persistent `conn.lock` file once no process uses it; older
-versions used its presence as a lock, whereas this version uses OS locking.
+Older binaries cannot read the new datastore envelope, even with file-key storage.
+Use a protected plaintext export for interoperability rather than opening a migrated
+datastore with an older binary. See [storage compatibility](docs/storage-format.md).
 
 ## Connection Fields
 
@@ -455,7 +454,7 @@ Files:
 Older versions of SSH Manager stored connections as a plain list without a
 stable `id` per entry. SSH Manager detects this legacy format automatically
 on load, assigns each connection a new `id`, and rewrites `conn` in the
-current schema on the next save — no manual migration step is required, and
+current schema atomically during the locked load — no manual migration step is required, and
 existing aliases/fields are preserved.
 
 ## Optional Master Passphrase
@@ -529,7 +528,12 @@ remain trusted; see [execution and backup boundaries](docs/security-boundaries.m
 
 ## Security notes
 
-- Connection data is encrypted at rest using AES-GCM.
+Read the [security policy and threat model](SECURITY.md) and [architecture](docs/architecture.md).
+The credential-display configuration has been removed; legacy settings are ignored.
+`doctor` warns about disabled host-key checks, agent forwarding, and root password
+authentication. `connect --alias prod --dry-run` prints redacted argv without starting SSH.
+
+- Connection data uses a versioned AES-256-GCM envelope with an authenticated header. Legacy ciphertext is migrated atomically on normal load. See [storage format](docs/storage-format.md).
 - Backups are passphrase-encrypted by default. Exports and `backup --plaintext` include plaintext passwords.
 - Key files are validated and stored with restrictive permissions.
 - OS keyring mode avoids storing the raw encryption key alongside encrypted connections.

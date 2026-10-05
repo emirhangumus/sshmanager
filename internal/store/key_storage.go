@@ -180,7 +180,7 @@ func (s *ConnectionStore) bootstrap(cfg config.SSHManagerConfig) (keyState, erro
 		return keyState{}, err
 	}
 	st := keyState{Version: 1, StoreID: hex.EncodeToString(id), Active: cfg.Security.KeyStorage}
-	if data, err := os.ReadFile(s.secretKeyFilePath); err == nil {
+	if data, err := storage.ReadFileRegular(s.secretKeyFilePath); err == nil {
 		key, err := cryptoutil.DecodeKeyFile(data)
 		if err != nil {
 			return st, err
@@ -237,7 +237,7 @@ func (s *ConnectionStore) ensureState(cfg config.SSHManagerConfig) (keyState, er
 			if st.Active == "file" {
 				key, err = cryptoutil.LoadKey(s.secretKeyFilePath)
 				if err == nil {
-					data, readErr := os.ReadFile(s.secretKeyFilePath)
+					data, readErr := storage.ReadFileRegular(s.secretKeyFilePath)
 					if readErr != nil {
 						return st, readErr
 					}
@@ -367,7 +367,7 @@ func (s *ConnectionStore) resume(st *keyState) error {
 			return err
 		}
 		if p.Restore {
-			data, err := os.ReadFile(s.restorePath())
+			data, err := storage.ReadFileRegular(s.restorePath())
 			if err != nil {
 				return err
 			}

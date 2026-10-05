@@ -48,8 +48,6 @@ func HandleConnect(connectionFilePath, secretKeyFilePath string, cfg *config.SSH
 		return false, nil
 	}
 
-	printCredentialsIfEnabled(conn, cfg)
-
 	if err := connect(conn); err != nil {
 		fmt.Printf(prompttext.DefaultPromptTexts.ErrorMessages.ConnectionToXFailedX+"\n", fmt.Sprintf("%s@%s", conn.Username, conn.Host), err)
 		return false, nil
@@ -68,6 +66,7 @@ func handleConnectArgs(connectionFilePath, secretKeyFilePath, configFilePath str
 
 	alias := fs.String("alias", "", "Connection alias")
 	id := fs.String("id", "", "Connection ID")
+	dryRun := fs.Bool("dry-run", false, "Print a redacted invocation without starting SSH")
 
 	if err := fs.Parse(args); err != nil {
 		return err
@@ -78,6 +77,21 @@ func handleConnectArgs(connectionFilePath, secretKeyFilePath, configFilePath str
 		return err
 	}
 
+	if *dryRun {
+		if selectedAlias == "" && selectedID == "" {
+			return fmt.Errorf("connect --dry-run requires --alias or --id")
+		}
+		connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath, store.WithConfigPath(configFilePath))
+		connFile, _, _, err := connStore.Inspect()
+		if err != nil {
+			return err
+		}
+		conn := findConnectionBySelector(&connFile, selectedAlias, selectedID)
+		if conn == nil {
+			return fmt.Errorf("connect: %s", notFoundMessage(selectedAlias, selectedID))
+		}
+		return printConnectInvocation(conn, os.Stdout)
+	}
 	if selectedAlias == "" && selectedID == "" {
 		cfg, err := config.LoadConfig(configFilePath)
 		if err != nil {
@@ -329,12 +343,21 @@ func shellQuoteSingle(s string) string {
 	return "'" + strings.ReplaceAll(s, "'", `'\''`) + "'"
 }
 
-func printCredentialsIfEnabled(conn *model.SSHConnection, cfg *config.SSHManagerConfig) {
-	if cfg == nil || !cfg.Behaviour.ShowCredentialsOnConnect {
-		return
+func printConnectInvocation(conn *model.SSHConnection, out io.Writer) error {
+	bin, args, _, err := buildConnectInvocation(conn)
+	if err != nil {
+		return err
 	}
-
-	fmt.Println("Warning: printing credentials to terminal (showCredentialsOnConnect=true)")
-	fmt.Printf("Username: %s\n", conn.Username)
-	fmt.Printf("Password: %s\n", conn.Password)
+	if _, err := fmt.Fprintf(out, "Executable: %s\nArguments:\n", bin); err != nil {
+		return err
+	}
+	for _, arg := range args {
+		// Dedicated jump secrets are environment-only; omit their channel reference
+		// from the display so the dry run contains neither values nor assignments.
+		arg = strings.ReplaceAll(arg, fmt.Sprintf(`SSHPASS="$%s" `, proxyJumpPasswordEnvVar), "")
+		if _, err := fmt.Fprintf(out, "  %q\n", arg); err != nil {
+			return err
+		}
+	}
+	return nil
 }

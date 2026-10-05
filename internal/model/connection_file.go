@@ -38,8 +38,8 @@ func NewConnectionFile() ConnectionFile {
 
 func (c *ConnectionFile) AddConnection(conn SSHConnection) error {
 	conn.Alias = strings.TrimSpace(conn.Alias)
-	if c.hasAliasConflict(conn.Alias, "") {
-		return fmt.Errorf("%w: %s", ErrAliasAlreadyExists, conn.Alias)
+	if err := c.aliasConflictError(conn.Alias, ""); err != nil {
+		return err
 	}
 
 	if strings.TrimSpace(conn.ID) == "" || c.hasID(conn.ID) {
@@ -86,8 +86,8 @@ func (c *ConnectionFile) UpdateConnectionByID(id string, updated SSHConnection) 
 	for i := range c.Connections {
 		if c.Connections[i].ID == id {
 			updated.Alias = strings.TrimSpace(updated.Alias)
-			if c.hasAliasConflict(updated.Alias, id) {
-				return true, fmt.Errorf("%w: %s", ErrAliasAlreadyExists, updated.Alias)
+			if err := c.aliasConflictError(updated.Alias, id); err != nil {
+				return true, err
 			}
 
 			updated.ID = id
@@ -164,10 +164,10 @@ func (c *ConnectionFile) hasID(id string) bool {
 	return false
 }
 
-func (c *ConnectionFile) hasAliasConflict(alias, excludeID string) bool {
+func (c *ConnectionFile) aliasConflictError(alias, excludeID string) error {
 	needle := normalizeAlias(alias)
 	if needle == "" {
-		return false
+		return nil
 	}
 
 	for i := range c.Connections {
@@ -176,11 +176,11 @@ func (c *ConnectionFile) hasAliasConflict(alias, excludeID string) bool {
 			continue
 		}
 		if normalizeAlias(conn.Alias) == needle {
-			return true
+			return fmt.Errorf("alias %q conflicts with existing alias %q: %w", alias, conn.Alias, ErrAliasAlreadyExists)
 		}
 	}
 
-	return false
+	return nil
 }
 
 func (c *ConnectionFile) generateUniqueID() string {

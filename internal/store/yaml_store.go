@@ -13,10 +13,3 @@ func toYAMLString(data interface{}) (string, error) {
 	}
 	return string(dataBytes), nil
 }
-
-func fromYAMLString(yamlStr string, out interface{}) error {
-	if err := yaml.Unmarshal([]byte(yamlStr), out); err != nil {
-		return fmt.Errorf("failed to unmarshal YAML: %w", err)
-	}
-	return nil
-}

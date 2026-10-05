@@ -1,6 +1,7 @@
 package cryptoutil
 
 import (
+	"bytes"
 	"crypto/aes"
 	"crypto/cipher"
 	"crypto/pbkdf2"
@@ -57,7 +58,7 @@ func LoadKey(filePath string) ([]byte, error) {
 
 // LoadExistingKey never creates a key. Existing ciphertext must not receive a replacement key.
 func LoadExistingKey(filePath string) ([]byte, error) {
-	key, err := os.ReadFile(filePath)
+	key, err := storage.ReadFileRegular(filePath)
 	if err != nil {
 		return nil, fmt.Errorf("failed to read key file: %w", err)
 	}
@@ -152,7 +153,7 @@ func ValidatePassphraseMetadata(data []byte) error {
 	if err := json.Unmarshal(data, &meta); err != nil {
 		return fmt.Errorf("invalid key file format: %w", err)
 	}
-	if meta.Mode != passphraseKeyFileMode || meta.Version != passphraseKeyFileV1 || meta.KDF != passphraseKeyFileKDF || meta.Iterations <= 0 {
+	if meta.Mode != passphraseKeyFileMode || meta.Version != passphraseKeyFileV1 || meta.KDF != passphraseKeyFileKDF || meta.Iterations < 1 || meta.Iterations > 2_000_000 {
 		return fmt.Errorf("invalid passphrase KDF metadata")
 	}
 	salt, err := base64.StdEncoding.DecodeString(meta.Salt)
@@ -173,41 +174,50 @@ func derivePassphraseKey(passphrase string, salt []byte, iterations int) ([]byte
 	return key, nil
 }
 
-// EncryptData encrypts plain text with AES-GCM and prefixes nonce bytes.
+// Store envelope v1: magic (8), format/cipher/schema/reserved (4), nonce (12),
+// ciphertext plus authentication tag. All 24 header bytes are GCM AAD.
+const storeMagic = "SSHMSTOR"
+const storeHeaderSize = 24
+const MaxStoreSize = 64 * 1024 * 1024
+
+func IsVersionedStore(data []byte) bool { return bytes.HasPrefix(data, []byte(storeMagic)) }
+
+// EncryptData writes the versioned AES-256-GCM datastore envelope.
 func EncryptData(data string, key []byte) ([]byte, error) {
+	if len(data) > MaxStoreSize-storeHeaderSize-16 {
+		return nil, fmt.Errorf("store exceeds size limit")
+	}
 	if len(key) != keySize {
 		return nil, fmt.Errorf("invalid key size: got %d, want %d", len(key), keySize)
 	}
-
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return nil, err
 	}
-
-	nonce := make([]byte, nonceSize)
-	if _, err := rand.Read(nonce); err != nil {
-		return nil, err
-	}
-
 	aead, err := cipher.NewGCM(block)
 	if err != nil {
 		return nil, err
 	}
-
-	ciphertext := aead.Seal(nil, nonce, []byte(data), nil)
-	return append(nonce, ciphertext...), nil
+	header := make([]byte, storeHeaderSize)
+	copy(header, storeMagic)
+	// Cipher 1 = AES-256-GCM; payload schema 1 = current YAML connection schema.
+	header[8], header[9], header[10] = 1, 1, 1
+	if _, err := rand.Read(header[12:24]); err != nil {
+		return nil, err
+	}
+	plain := []byte(data)
+	defer clear(plain)
+	return aead.Seal(header, header[12:24], plain, header), nil
 }
 
-// DecryptData decrypts AES-GCM payloads where nonce is prefixed.
-func DecryptData(encryptedData, key []byte) (string, error) {
+// DecryptData reads versioned stores and legacy nonce-prefixed AES-GCM.
+func DecryptData(data, key []byte) (string, error) {
 	if len(key) != keySize {
 		return "", fmt.Errorf("invalid key size: got %d, want %d", len(key), keySize)
 	}
-	if len(encryptedData) < nonceSize {
-		return "", fmt.Errorf("invalid data format: encrypted payload too short")
+	if len(data) > MaxStoreSize {
+		return "", fmt.Errorf("store exceeds size limit")
 	}
-
-	nonce, ciphertext := encryptedData[:nonceSize], encryptedData[nonceSize:]
 	block, err := aes.NewCipher(key)
 	if err != nil {
 		return "", err
@@ -216,10 +226,25 @@ func DecryptData(encryptedData, key []byte) (string, error) {
 	if err != nil {
 		return "", err
 	}
-
-	plaintext, err := aead.Open(nil, nonce, ciphertext, nil)
+	var nonce, ciphertext, aad []byte
+	if IsVersionedStore(data) {
+		if len(data) < storeHeaderSize+aead.Overhead() {
+			return "", fmt.Errorf("truncated store envelope")
+		}
+		if !bytes.Equal(data[8:12], []byte{1, 1, 1, 0}) {
+			return "", fmt.Errorf("unsupported store format, cipher, or payload schema")
+		}
+		nonce, ciphertext, aad = data[12:24], data[24:], data[:24]
+	} else {
+		if len(data) < nonceSize+aead.Overhead() {
+			return "", fmt.Errorf("invalid data format: encrypted payload too short")
+		}
+		nonce, ciphertext = data[:nonceSize], data[nonceSize:]
+	}
+	plaintext, err := aead.Open(nil, nonce, ciphertext, aad)
 	if err != nil {
 		return "", fmt.Errorf("failed to decrypt data: %w", err)
 	}
+	defer clear(plaintext)
 	return string(plaintext), nil
 }

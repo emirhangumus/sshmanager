@@ -71,7 +71,7 @@ build-compressed: check-upx build
 	@upx --best --lzma $(BIN_DIR)/$(BIN_NAME)
 	@echo "✓ Compressed binary with UPX"
 
-install: check-sshpass build
+install: build
 	@echo "Installing $(APP_NAME)..."
 	@mkdir -p $(INSTALL_PATH)
 	@cp $(BIN_DIR)/$(BIN_NAME) $(INSTALL_PATH)
@@ -79,7 +79,7 @@ install: check-sshpass build
 	@echo "✓ Installed to $(INSTALL_PATH)"
 	@echo "Make sure $(INSTALL_PATH) is in your PATH"
 
-install-compressed: check-sshpass build-compressed
+install-compressed: build-compressed
 	@echo "Installing compressed $(APP_NAME)..."
 	@mkdir -p $(INSTALL_PATH)
 	@cp $(BIN_DIR)/$(BIN_NAME) $(INSTALL_PATH)

@@ -57,7 +57,6 @@ func TestSetupDoesNotOverrideExistingConfig(t *testing.T) {
 
 	custom := config.Default()
 	custom.Behaviour.ContinueAfterSSHExit = true
-	custom.Behaviour.ShowCredentialsOnConnect = true
 	if err := config.SaveConfig(configPath, custom); err != nil {
 		t.Fatalf("SaveConfig failed: %v", err)
 	}

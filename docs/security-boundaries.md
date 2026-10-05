@@ -24,7 +24,7 @@ The master-passphrase environment interface also remains unchanged. Environment
 channels, running processes, terminal output, and Go strings are not secret-storage
 boundaries against the same user or root. Mutable input and derived-key buffers
 are cleared where practical; this is best-effort lifetime reduction, not guaranteed
-memory erasure. The existing credential-display setting is outside these changes.
+memory erasure. Normal configuration cannot enable credential display.
 
 ## Portable encrypted backups
 
@@ -49,7 +49,7 @@ The complete 40-byte header is GCM additional authenticated data. Unknown identi
 invalid lengths, wrong passphrases, and authentication failures are rejected before
 restore mutates state. Restore bounds input at 64 MiB. The plaintext snapshot retains
 backup version, creation time, configuration, and connections. Those fields are
-inside encryption. Datastore encryption remains unchanged by the backup format.
+inside encryption. Datastore ciphertext uses its own [versioned envelope](storage-format.md).
 
 Legacy plaintext backups and connection exports remain restorable. Authenticated
 backups protect confidentiality and integrity, but do not establish who created a

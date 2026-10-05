@@ -42,7 +42,7 @@ Connection Commands:
         Target: --alias <alias> | --id <connection-id>
         Required: --to <new-alias>
   connect [flags]
-        Connect to a saved host (interactive if no flags)
+        Connect to a saved host (interactive if no flags); --dry-run prints redacted argv
         Target: --alias <alias> | --id <connection-id>
   exec (--alias <alias> | --id <connection-id>) -- <command-string>
         Run one remote command without a TTY; return its exit status

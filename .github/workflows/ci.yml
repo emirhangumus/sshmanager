@@ -23,7 +23,7 @@ jobs:
           go-version-file: go.mod
 
       - name: Run tests with race detector
-        run: go test -race ./...
+        run: go test -race -shuffle=on ./...
 
       - name: Run tests with coverage
         run: go test -coverprofile=coverage.out ./...
@@ -33,6 +33,11 @@ jobs:
           total_cov="$(go tool cover -func=coverage.out | awk '/^total:/ {gsub("%","",$3); print $3}')"
           echo "Total coverage: ${total_cov}%"
           awk -v cov="${total_cov}" -v min="${COVERAGE_MIN}" 'BEGIN { if (cov+0 < min+0) { printf("Coverage %.1f%% is below minimum %.1f%%\n", cov, min); exit 1 } }'
+
+      - name: Fuzz encrypted store and backup decoders
+        run: |
+          go test ./internal/crypto -run '^$' -fuzz '^FuzzDecryptData$' -fuzztime=10s -parallel=2
+          go test ./internal/cli/commands -run '^$' -fuzz '^FuzzBackupDecode$' -fuzztime=10s -parallel=2
 
       - name: Run vet
         run: go vet ./...
@@ -60,4 +65,4 @@ jobs:
           go-version-file: go.mod
 
       - name: Run tests
-        run: go test ./...
+        run: go test -shuffle=on ./...
