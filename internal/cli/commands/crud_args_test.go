@@ -76,11 +76,11 @@ func TestHandleAddArgsAddsConnectionWithProxyJumpPassword(t *testing.T) {
 		"--host", "internal.example.com",
 		"--username", "targetuser",
 		"--auth-mode", model.AuthModePassword,
-		"--password", "target-secret",
+		"--password-unsafe", "target-secret",
 		"--alias", "internal-server",
 		"--proxy-jump", "jumpuser@bastion.example.com",
 		"--proxy-jump-auth-mode", model.AuthModePassword,
-		"--proxy-jump-password", "jump-secret",
+		"--proxy-jump-password-unsafe", "jump-secret",
 	}, &out)
 	if err != nil {
 		t.Fatalf("handleAddArgs failed: %v", err)

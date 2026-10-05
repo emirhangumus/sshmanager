@@ -7,6 +7,7 @@ import (
 	"io"
 	"os"
 	"os/exec"
+	"path/filepath"
 	"strconv"
 	"strings"
 
@@ -95,6 +96,10 @@ func classifyScpArgs(connFile *model.ConnectionFile, positional []string) ([]scp
 		alias, remotePath, hasColon := strings.Cut(raw, ":")
 		if hasColon {
 			if conn := connFile.GetConnectionByAlias(alias); conn != nil {
+				// Legacy scp invokes a remote shell; reject ambiguous remote path syntax.
+				if strings.ContainsAny(remotePath, " \t\r\n\x00\\\"'`$;&|<>(){}[]*?!#") {
+					return nil, errors.New("scp: remote path contains unsupported shell metacharacters or whitespace")
+				}
 				result = append(result, scpArg{raw: raw, conn: conn, remotePath: remotePath})
 				continue
 			}
@@ -129,12 +134,27 @@ func singleRemoteConnection(args []scpArg) (*model.SSHConnection, error) {
 // path unchanged.
 func scpArgSpec(a scpArg, conn *model.SSHConnection) string {
 	if !a.isRemote() {
+		// A local colon must not turn into another remote host in scp.
+		if strings.Contains(a.raw, ":") && !filepath.IsAbs(a.raw) {
+			return "./" + a.raw
+		}
 		return a.raw
 	}
-	return fmt.Sprintf("%s@%s:%s", strings.TrimSpace(conn.Username), strings.TrimSpace(conn.Host), a.remotePath)
+	host := strings.TrimSpace(conn.Host)
+	if strings.Contains(host, ":") && !strings.HasPrefix(host, "[") {
+		host = "[" + host + "]"
+	}
+	remotePath := a.remotePath
+	if strings.HasPrefix(remotePath, "-") {
+		remotePath = "./" + remotePath
+	}
+	return fmt.Sprintf("%s@%s:%s", strings.TrimSpace(conn.Username), host, remotePath)
 }
 
 func buildScpInvocation(conn *model.SSHConnection, recursive bool, sources []string, dest string) (string, []string, []string, error) {
+	if err := model.ValidateSSHTarget(strings.TrimSpace(conn.Username), strings.TrimSpace(conn.Host), conn.Port); err != nil {
+		return "", nil, nil, err
+	}
 	username := strings.TrimSpace(conn.Username)
 	host := strings.TrimSpace(conn.Host)
 	if username == "" || host == "" {
@@ -152,6 +172,7 @@ func buildScpInvocation(conn *model.SSHConnection, recursive bool, sources []str
 	if recursive {
 		pathArgs = append(pathArgs, "-r")
 	}
+	pathArgs = append(pathArgs, "--")
 	pathArgs = append(pathArgs, sources...)
 	pathArgs = append(pathArgs, dest)
 
@@ -196,6 +217,9 @@ func buildScpInvocation(conn *model.SSHConnection, recursive bool, sources []str
 // ProxyJump and ExtraSSHArgs apply the same way, but LocalForwards /
 // RemoteForwards are meaningless for a one-shot file copy and are omitted.
 func buildAdvancedScpArgs(conn *model.SSHConnection) ([]string, []string, error) {
+	if err := validateExecSSHArgs(conn.ExtraSSHArgs); err != nil {
+		return nil, nil, err
+	}
 	proxyJump := strings.TrimSpace(conn.ProxyJump)
 	extraArgs := model.NormalizeStringList(conn.ExtraSSHArgs)
 
@@ -206,6 +230,15 @@ func buildAdvancedScpArgs(conn *model.SSHConnection) ([]string, []string, error)
 		return nil, nil, fmt.Errorf("invalid extra ssh args: %w", err)
 	}
 
+	for _, arg := range extraArgs {
+		if strings.HasPrefix(arg, "-") && !strings.HasPrefix(arg, "-o") {
+			switch arg {
+			case "-4", "-6", "-A", "-C", "-q", "-v", "-vv", "-vvv":
+			default:
+				return nil, nil, fmt.Errorf("SSH option %q is incompatible with scp", arg)
+			}
+		}
+	}
 	proxyJumpArgs, proxyJumpEnv, err := buildProxyJumpArgs(conn, proxyJump)
 	if err != nil {
 		return nil, nil, err
@@ -236,7 +269,7 @@ func runScp(bin string, args []string, envAdd []string, host string, port int) e
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), envAdd...)
+	cmd.Env = scopedProcessEnv(envAdd)
 
 	err = cmd.Run()
 	if bin == "sshpass" {

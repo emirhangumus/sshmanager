@@ -117,7 +117,7 @@ func connect(conn *model.SSHConnection) error {
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	cmd.Stderr = os.Stderr
-	cmd.Env = append(os.Environ(), envAdd...)
+	cmd.Env = scopedProcessEnv(envAdd)
 
 	err = cmd.Run()
 	if bin == "sshpass" {
@@ -150,6 +150,9 @@ func translateSSHPassError(err error, host string) error {
 }
 
 func buildConnectInvocation(conn *model.SSHConnection) (string, []string, []string, error) {
+	if err := model.ValidateSSHTarget(strings.TrimSpace(conn.Username), strings.TrimSpace(conn.Host), conn.Port); err != nil {
+		return "", nil, nil, err
+	}
 	username := strings.TrimSpace(conn.Username)
 	host := strings.TrimSpace(conn.Host)
 	if username == "" || host == "" {
@@ -172,7 +175,7 @@ func buildConnectInvocation(conn *model.SSHConnection) (string, []string, []stri
 		}
 		sshArgs := []string{"-p", port}
 		sshArgs = append(sshArgs, advancedArgs...)
-		sshArgs = append(sshArgs, target)
+		sshArgs = append(sshArgs, "--", target)
 		env := append([]string{"SSHPASS=" + password}, advancedEnv...)
 		return "sshpass", append([]string{"-e", "ssh"}, sshArgs...), env, nil
 	case model.AuthModeKey:
@@ -189,12 +192,12 @@ func buildConnectInvocation(conn *model.SSHConnection) (string, []string, []stri
 		}
 		sshArgs := []string{"-p", port, "-i", identity}
 		sshArgs = append(sshArgs, advancedArgs...)
-		sshArgs = append(sshArgs, target)
+		sshArgs = append(sshArgs, "--", target)
 		return "ssh", sshArgs, advancedEnv, nil
 	case model.AuthModeAgent:
 		sshArgs := []string{"-p", port}
 		sshArgs = append(sshArgs, advancedArgs...)
-		sshArgs = append(sshArgs, target)
+		sshArgs = append(sshArgs, "--", target)
 		return "ssh", sshArgs, advancedEnv, nil
 	default:
 		return "", nil, nil, fmt.Errorf("unsupported auth mode: %s", authMode)
@@ -295,6 +298,9 @@ func buildProxyJumpArgs(conn *model.SSHConnection, proxyJump string) ([]string, 
 		tokens = append(tokens, "-p", shellQuoteSingle(port))
 	}
 	if identityFile != "" {
+		if strings.ContainsAny(identityFile, "%\r\n\x00") {
+			return nil, nil, fmt.Errorf("proxy jump identity path cannot contain OpenSSH percent tokens or control characters")
+		}
 		info, statErr := os.Stat(identityFile)
 		if statErr != nil {
 			return nil, nil, fmt.Errorf("proxyJumpIdentityFile %q is not accessible: %w", identityFile, statErr)
@@ -304,7 +310,7 @@ func buildProxyJumpArgs(conn *model.SSHConnection, proxyJump string) ([]string, 
 		}
 		tokens = append(tokens, "-i", shellQuoteSingle(identityFile))
 	}
-	tokens = append(tokens, "-W", "%h:%p")
+	tokens = append(tokens, "-W", "'%h:%p'")
 
 	hopTarget := host
 	if user != "" {

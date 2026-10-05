@@ -22,7 +22,7 @@ func TestBuildScpInvocationPasswordMode(t *testing.T) {
 	if bin != "sshpass" {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
-	wantArgs := []string{"-e", "scp", "-P", "22", "./file.txt", "ubuntu@example.com:/tmp/"}
+	wantArgs := []string{"-e", "scp", "-P", "22", "--", "./file.txt", "ubuntu@example.com:/tmp/"}
 	assertStringSliceEqual(t, args, wantArgs)
 	assertStringSliceEqual(t, env, []string{"SSHPASS=secret"})
 }
@@ -44,7 +44,7 @@ func TestBuildScpInvocationKeyModeRecursive(t *testing.T) {
 	if bin != "scp" {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
-	wantArgs := []string{"-P", "2222", "-i", identityFile, "-r", "./dist", "ubuntu@example.com:/srv/www"}
+	wantArgs := []string{"-P", "2222", "-i", identityFile, "-r", "--", "./dist", "ubuntu@example.com:/srv/www"}
 	assertStringSliceEqual(t, args, wantArgs)
 	if len(env) != 0 {
 		t.Fatalf("expected no extra env for key mode, got %v", env)
@@ -65,7 +65,7 @@ func TestBuildScpInvocationAgentMode(t *testing.T) {
 	if bin != "scp" {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
-	wantArgs := []string{"-P", "22", "ubuntu@example.com:/tmp/log.txt", "./log.txt"}
+	wantArgs := []string{"-P", "22", "--", "ubuntu@example.com:/tmp/log.txt", "./log.txt"}
 	assertStringSliceEqual(t, args, wantArgs)
 	if len(env) != 0 {
 		t.Fatalf("expected no extra env for agent mode, got %v", env)
@@ -99,6 +99,7 @@ func TestBuildScpInvocationWithProxyJumpAndExtraArgs(t *testing.T) {
 		"-J", "jump.internal:2222",
 		"-vv",
 		"-o", "ServerAliveInterval=30",
+		"--",
 		"./file.txt", "ubuntu@example.com:/tmp/",
 	}
 	assertStringSliceEqual(t, args, wantArgs)

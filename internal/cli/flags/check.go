@@ -22,13 +22,13 @@ func PrintUsage(out io.Writer) {
 Connection Commands:
   add [flags]
         Create a new SSH connection (interactive if no flags)
-        --host --username [--port] [--auth-mode password|key|agent] [--password] [--identity-file]
+        --host --username [--port] [--auth-mode password|key|agent] [--password-stdin | --password-fd N] [--identity-file]
         [--proxy-jump] [--local-forward ...] [--remote-forward ...] [--extra-ssh-arg ...]
         [--group] [--tag ...] [--description] [--alias]
   edit [flags]
         Update an existing connection (interactive if no flags)
         Target: --alias <alias> | --id <connection-id>
-        Updates: --new-host --new-username --new-port --new-auth-mode --new-password --new-identity-file
+        Updates: --new-host --new-username --new-port --new-auth-mode --new-password-stdin --new-password-fd N --new-identity-file
         --new-proxy-jump --new-local-forward ... --new-remote-forward ... --new-extra-ssh-arg ...
         --new-group --new-tag ... --new-description --new-alias
         Clears: --clear-alias --clear-description --clear-proxy-jump --clear-group
@@ -62,10 +62,10 @@ Transfer / Recovery Commands:
         Export decrypted connection data to file
   import --in <path> [--format auto|yaml|json] [--mode merge|replace]
         Import connection data from file
-  backup --out <path> [--format yaml|json] [--include-config=true|false]
-        Create recovery snapshot (connections + optional config)
+  backup --out <path> [--format yaml|json] [--include-config=true|false] [--passphrase-stdin | --passphrase-fd N] [--plaintext]
+        Create passphrase-encrypted recovery snapshot (use --plaintext for unsafe plaintext output)
   restore --in <path> [--format auto|yaml|json] [--mode merge|replace] [--with-config=true|false]
-        Restore from recovery snapshot
+        Restore encrypted or legacy plaintext snapshot; encrypted input accepts --passphrase-stdin/--passphrase-fd N
   doctor [--json]
         Run consistency diagnostics for config/key/connection data
 

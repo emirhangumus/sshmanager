@@ -3,6 +3,7 @@ package commands
 import (
 	"bytes"
 	"fmt"
+	"github.com/emirhangumus/sshmanager/v2/internal/model"
 	"io"
 	"os"
 	"os/exec"
@@ -27,6 +28,9 @@ import (
 // not a real session. The subsequent sshpass connection then proceeds
 // exactly as it would have if the host key had already been trusted.
 func ensureHostKeyAccepted(host string, port int) error {
+	if err := model.ValidateSSHHost(host); err != nil {
+		return err
+	}
 	if hostKeyKnown(host, port) {
 		return nil
 	}
@@ -42,8 +46,9 @@ func ensureHostKeyAccepted(host string, port int) error {
 		"-p", strconv.Itoa(port),
 		"-o", "BatchMode=no",
 		"-o", "NumberOfPasswordPrompts=0",
-		host, "exit",
+		"--", host, "exit",
 	)
+	cmd.Env = scopedProcessEnv(nil)
 	cmd.Stdin = os.Stdin
 	cmd.Stdout = os.Stdout
 	stderr := &primingStderrFilter{out: os.Stderr}
@@ -99,5 +104,6 @@ func hostKeyKnown(host string, port int) bool {
 		hostPattern = fmt.Sprintf("[%s]:%d", host, port)
 	}
 	cmd := exec.Command("ssh-keygen", "-F", hostPattern)
+	cmd.Env = scopedProcessEnv(nil)
 	return cmd.Run() == nil
 }

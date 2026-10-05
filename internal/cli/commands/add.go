@@ -49,11 +49,11 @@ func handleAddArgs(connectionFilePath, secretKeyFilePath string, args []string, 
 	username := fs.String("username", "", "SSH username")
 	port := fs.Int("port", 0, "SSH port (default 22)")
 	authMode := fs.String("auth-mode", "", "Auth mode: password|key|agent")
-	password := fs.String("password", "", "SSH password (password mode)")
+	passwordInput := registerSecretInput(fs, "password")
 	identityFile := fs.String("identity-file", "", "Identity file path (key mode)")
 	proxyJump := fs.String("proxy-jump", "", "ProxyJump spec ([user@]host[:port][,[user@]host[:port]...])")
 	proxyJumpAuthMode := fs.String("proxy-jump-auth-mode", "", "ProxyJump auth mode: password|key|agent (defaults to key/agent, independent of target auth)")
-	proxyJumpPassword := fs.String("proxy-jump-password", "", "ProxyJump password (required if proxy-jump-auth-mode is password)")
+	jumpPasswordInput := registerSecretInput(fs, "proxy-jump-password")
 	proxyJumpIdentityFile := fs.String("proxy-jump-identity-file", "", "ProxyJump identity file path")
 	group := fs.String("group", "", "Connection group name")
 	alias := fs.String("alias", "", "Connection alias")
@@ -74,16 +74,28 @@ func handleAddArgs(connectionFilePath, secretKeyFilePath string, args []string, 
 		return fmt.Errorf("add: unexpected arguments: %s", strings.Join(fs.Args(), " "))
 	}
 
+	if *passwordInput.stdin && *jumpPasswordInput.stdin {
+		return fmt.Errorf("use separate file descriptors for target and jump passwords")
+	}
+	password, err := passwordInput.read(fs, model.NormalizeAuthMode(*authMode) == model.AuthModePassword, false)
+	if err != nil {
+		return err
+	}
+	jumpPassword, err := jumpPasswordInput.read(fs, model.NormalizeAuthMode(*proxyJumpAuthMode) == model.AuthModePassword, false)
+	if err != nil {
+		return err
+	}
+
 	conn := model.SSHConnection{
 		Host:                  strings.TrimSpace(*host),
 		Username:              strings.TrimSpace(*username),
 		Port:                  *port,
 		AuthMode:              strings.TrimSpace(*authMode),
-		Password:              *password,
+		Password:              password,
 		IdentityFile:          strings.TrimSpace(*identityFile),
 		ProxyJump:             strings.TrimSpace(*proxyJump),
 		ProxyJumpAuthMode:     strings.TrimSpace(*proxyJumpAuthMode),
-		ProxyJumpPassword:     *proxyJumpPassword,
+		ProxyJumpPassword:     jumpPassword,
 		ProxyJumpIdentityFile: strings.TrimSpace(*proxyJumpIdentityFile),
 		LocalForwards:         localForwards.Values(),
 		RemoteForwards:        remoteForwards.Values(),

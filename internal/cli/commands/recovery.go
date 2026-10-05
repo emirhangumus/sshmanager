@@ -14,6 +14,7 @@ import (
 	"time"
 
 	"github.com/emirhangumus/sshmanager/v2/internal/config"
+	cryptoutil "github.com/emirhangumus/sshmanager/v2/internal/crypto"
 	"github.com/emirhangumus/sshmanager/v2/internal/model"
 	"github.com/emirhangumus/sshmanager/v2/internal/storage"
 	"github.com/emirhangumus/sshmanager/v2/internal/store"
@@ -39,6 +40,8 @@ func handleBackup(connectionFilePath, secretKeyFilePath, configFilePath string, 
 
 	outPath := fs.String("out", "", "Backup output path")
 	format := fs.String("format", "yaml", "Backup format: yaml|json")
+	plaintext := fs.Bool("plaintext", false, "UNSAFE: write plaintext credentials for interoperability")
+	passphraseInput := registerSecretInput(fs, "passphrase")
 	includeConfig := fs.Bool("include-config", true, "Include config in backup")
 
 	if err := fs.Parse(args); err != nil {
@@ -53,6 +56,18 @@ func handleBackup(connectionFilePath, secretKeyFilePath, configFilePath string, 
 		return errors.New("missing required --out path")
 	}
 
+	var passphrase string
+	if *plaintext {
+		if passphraseInput.supplied(fs) {
+			return errors.New("--plaintext cannot be combined with passphrase input")
+		}
+	} else {
+		var err error
+		passphrase, err = passphraseInput.read(fs, true, true)
+		if err != nil {
+			return err
+		}
+	}
 	connStore := store.NewConnectionStore(connectionFilePath, secretKeyFilePath, store.WithConfigPath(configFilePath))
 	connFile, err := connStore.Load()
 	if err != nil {
@@ -77,6 +92,14 @@ func handleBackup(connectionFilePath, secretKeyFilePath, configFilePath string, 
 	if err != nil {
 		return err
 	}
+	defer clear(encoded)
+	if !*plaintext {
+		encoded, err = cryptoutil.EncryptBackup(encoded, passphrase)
+		if err != nil {
+			return err
+		}
+		normalizedFormat = "encrypted " + normalizedFormat
+	}
 	if err := storage.WriteFileAtomic(target, encoded, 0o600); err != nil {
 		return fmt.Errorf("failed to write backup file: %w", err)
 	}
@@ -96,6 +119,7 @@ func handleRestore(connectionFilePath, secretKeyFilePath, configFilePath string,
 	inPath := fs.String("in", "", "Backup input path")
 	format := fs.String("format", "auto", "Backup format: auto|yaml|json")
 	mode := fs.String("mode", importModeMerge, "Restore mode: merge|replace")
+	passphraseInput := registerSecretInput(fs, "passphrase")
 	withConfig := fs.Bool("with-config", true, "Restore config if available in backup")
 
 	if err := fs.Parse(args); err != nil {
@@ -110,11 +134,34 @@ func handleRestore(connectionFilePath, secretKeyFilePath, configFilePath string,
 		return errors.New("missing required --in path")
 	}
 
-	payload, err := os.ReadFile(source)
+	file, err := os.Open(source)
+	if err != nil {
+		return fmt.Errorf("failed to read restore file: %w", err)
+	}
+	defer file.Close()
+	payload, err := io.ReadAll(io.LimitReader(file, cryptoutil.MaxBackupSize+1))
 	if err != nil {
 		return fmt.Errorf("failed to read restore file: %w", err)
 	}
 
+	defer func() { clear(payload) }()
+	if len(payload) > cryptoutil.MaxBackupSize {
+		return errors.New("backup exceeds size limit")
+	}
+	if cryptoutil.IsEncryptedBackup(payload) {
+		passphrase, readErr := passphraseInput.read(fs, true, false)
+		if readErr != nil {
+			return readErr
+		}
+		decrypted, decryptErr := cryptoutil.DecryptBackup(payload, passphrase)
+		if decryptErr != nil {
+			return decryptErr
+		}
+		clear(payload)
+		payload = decrypted
+	} else if passphraseInput.supplied(fs) {
+		return errors.New("passphrase input supplied for a plaintext backup")
+	}
 	snapshot, err := decodeBackupSnapshot(payload, *format, source)
 	if err != nil {
 		return err
@@ -189,13 +236,11 @@ func decodeBackupSnapshot(data []byte, formatHint, inPath string) (backupSnapsho
 	case "json":
 		return decodeBackupSnapshotJSON(data, formatHint, inPath)
 	case "auto":
-		if snapshot, err := decodeBackupSnapshotJSON(data, formatHint, inPath); err == nil {
-			return snapshot, nil
+		trimmed := bytes.TrimSpace(data)
+		if trimmed[0] == '{' || trimmed[0] == '[' {
+			return decodeBackupSnapshotJSON(data, "json", "")
 		}
-		if snapshot, err := decodeBackupSnapshotYAML(data, formatHint, inPath); err == nil {
-			return snapshot, nil
-		}
-		return backupSnapshot{}, errors.New("failed to decode restore file")
+		return decodeBackupSnapshotYAML(data, "yaml", "")
 	default:
 		return backupSnapshot{}, fmt.Errorf("unknown restore format %q (use auto, yaml, or json)", formatHint)
 	}
@@ -204,9 +249,15 @@ func decodeBackupSnapshot(data []byte, formatHint, inPath string) (backupSnapsho
 func decodeBackupSnapshotJSON(data []byte, formatHint, inPath string) (backupSnapshot, error) {
 	var snapshot backupSnapshot
 	if err := json.Unmarshal(bytes.TrimSpace(data), &snapshot); err == nil && isBackupSnapshot(snapshot) {
+		if snapshot.BackupVersion != "" && snapshot.BackupVersion != backupSchemaVersion {
+			return backupSnapshot{}, errors.New("unsupported backup schema version")
+		}
 		return normalizeBackupSnapshot(snapshot), nil
 	}
 
+	if err := validateLegacyBackupShape(data); err != nil {
+		return backupSnapshot{}, err
+	}
 	connFile, err := decodeImportedConnectionFile(data, formatHint, inPath)
 	if err != nil {
 		return backupSnapshot{}, err
@@ -221,9 +272,15 @@ func decodeBackupSnapshotJSON(data []byte, formatHint, inPath string) (backupSna
 func decodeBackupSnapshotYAML(data []byte, formatHint, inPath string) (backupSnapshot, error) {
 	var snapshot backupSnapshot
 	if err := yaml.Unmarshal(data, &snapshot); err == nil && isBackupSnapshot(snapshot) {
+		if snapshot.BackupVersion != "" && snapshot.BackupVersion != backupSchemaVersion {
+			return backupSnapshot{}, errors.New("unsupported backup schema version")
+		}
 		return normalizeBackupSnapshot(snapshot), nil
 	}
 
+	if err := validateLegacyBackupShape(data); err != nil {
+		return backupSnapshot{}, err
+	}
 	connFile, err := decodeImportedConnectionFile(data, formatHint, inPath)
 	if err != nil {
 		return backupSnapshot{}, err
@@ -440,4 +497,27 @@ func handleDoctor(connectionFilePath, secretKeyFilePath, configFilePath string, 
 		return errors.New("doctor found one or more issues")
 	}
 	return nil
+}
+
+// Reject unrelated mappings/scalars instead of accepting them as empty stores.
+func validateLegacyBackupShape(data []byte) error {
+	var document yaml.Node
+	if err := yaml.Unmarshal(data, &document); err != nil {
+		return err
+	}
+	if len(document.Content) != 1 {
+		return errors.New("invalid backup document")
+	}
+	root := document.Content[0]
+	if root.Kind == yaml.SequenceNode {
+		return nil
+	}
+	if root.Kind == yaml.MappingNode {
+		for i := 0; i < len(root.Content); i += 2 {
+			if root.Content[i].Value == "connections" {
+				return nil
+			}
+		}
+	}
+	return errors.New("backup does not contain a connection snapshot")
 }

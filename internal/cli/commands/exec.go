@@ -152,7 +152,7 @@ func buildExecInvocation(conn *model.SSHConnection, remoteCommand string) (strin
 	}
 	// The destination is the final argument from buildConnectInvocation.
 	destination := args[len(args)-1]
-	args = append(args[:len(args)-1], "-T", destination, remoteCommand)
+	args = append(args[:len(args)-2], "-T", "--", destination, remoteCommand)
 	return bin, args, env, nil
 }
 
@@ -205,7 +205,7 @@ func runExec(bin string, args, envAdd []string, conn *model.SSHConnection, stdin
 	cmd.Stdin = stdin
 	cmd.Stdout = stdout
 	cmd.Stderr = stderr
-	cmd.Env = append(os.Environ(), envAdd...)
+	cmd.Env = scopedProcessEnv(envAdd)
 	err = cmd.Run()
 	if err == nil {
 		return nil

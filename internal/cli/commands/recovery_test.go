@@ -34,7 +34,7 @@ func TestHandleBackupJSONWithoutConfig(t *testing.T) {
 	backupPath := filepath.Join(t.TempDir(), "backup.json")
 	var out strings.Builder
 	if err := handleBackup(connPath, keyPath, cfgPath, []string{
-		"--out", backupPath,
+		"--plaintext", "--out", backupPath,
 		"--format", "json",
 		"--include-config=false",
 	}, &out); err != nil {
@@ -81,7 +81,7 @@ func TestHandleRestoreReplaceRestoresConnectionsAndConfig(t *testing.T) {
 	}
 
 	backupPath := filepath.Join(t.TempDir(), "snapshot.yaml")
-	if err := handleBackup(connPath, keyPath, cfgPath, []string{"--out", backupPath}, ioDiscard()); err != nil {
+	if err := handleBackup(connPath, keyPath, cfgPath, []string{"--plaintext", "--out", backupPath}, ioDiscard()); err != nil {
 		t.Fatalf("handleBackup failed: %v", err)
 	}
 

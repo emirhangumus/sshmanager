@@ -88,11 +88,11 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 	newUsername := fs.String("new-username", "", "New username")
 	newPort := fs.Int("new-port", -1, "New SSH port (use 22 for default)")
 	newAuthMode := fs.String("new-auth-mode", "", "New auth mode: password|key|agent")
-	newPassword := fs.String("new-password", "", "New password")
+	passwordInput := registerSecretInput(fs, "new-password")
 	newIdentityFile := fs.String("new-identity-file", "", "New identity file path")
 	newProxyJump := fs.String("new-proxy-jump", "", "New ProxyJump spec")
 	newProxyJumpAuthMode := fs.String("new-proxy-jump-auth-mode", "", "New ProxyJump auth mode: password|key|agent")
-	newProxyJumpPassword := fs.String("new-proxy-jump-password", "", "New ProxyJump password")
+	jumpPasswordInput := registerSecretInput(fs, "new-proxy-jump-password")
 	newProxyJumpIdentityFile := fs.String("new-proxy-jump-identity-file", "", "New ProxyJump identity file path")
 	clearProxyJumpPassword := fs.Bool("clear-proxy-jump-password", false, "Clear proxy jump password")
 	clearProxyJumpIdentityFile := fs.Bool("clear-proxy-jump-identity-file", false, "Clear proxy jump identity file")
@@ -120,6 +120,19 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 		return err
 	}
 
+	if *passwordInput.stdin && *jumpPasswordInput.stdin {
+		return fmt.Errorf("use separate file descriptors for target and jump passwords")
+	}
+	newPasswordValue, err := passwordInput.read(fs, model.NormalizeAuthMode(*newAuthMode) == model.AuthModePassword, false)
+	if err != nil {
+		return err
+	}
+	newJumpPasswordValue, err := jumpPasswordInput.read(fs, model.NormalizeAuthMode(*newProxyJumpAuthMode) == model.AuthModePassword, false)
+	if err != nil {
+		return err
+	}
+	newPassword, newProxyJumpPassword := &newPasswordValue, &newJumpPasswordValue
+
 	selectedAlias, selectedID, err := resolveSelector(*alias, *id, fs.Args(), "edit")
 	if err != nil {
 		return err
@@ -136,7 +149,7 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 	if *clearProxyJump && strings.TrimSpace(*newProxyJump) != "" {
 		return fmt.Errorf("edit: use either --new-proxy-jump or --clear-proxy-jump, not both")
 	}
-	if *clearProxyJumpPassword && strings.TrimSpace(*newProxyJumpPassword) != "" {
+	if *clearProxyJumpPassword && *newProxyJumpPassword != "" {
 		return fmt.Errorf("edit: use either --new-proxy-jump-password or --clear-proxy-jump-password, not both")
 	}
 	if *clearProxyJumpIdentityFile && strings.TrimSpace(*newProxyJumpIdentityFile) != "" {
@@ -162,11 +175,11 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 		strings.TrimSpace(*newUsername) != "" ||
 		*newPort >= 0 ||
 		strings.TrimSpace(*newAuthMode) != "" ||
-		strings.TrimSpace(*newPassword) != "" ||
+		*newPassword != "" ||
 		strings.TrimSpace(*newIdentityFile) != "" ||
 		strings.TrimSpace(*newProxyJump) != "" ||
 		strings.TrimSpace(*newProxyJumpAuthMode) != "" ||
-		strings.TrimSpace(*newProxyJumpPassword) != "" ||
+		*newProxyJumpPassword != "" ||
 		strings.TrimSpace(*newProxyJumpIdentityFile) != "" ||
 		*clearProxyJumpPassword ||
 		*clearProxyJumpIdentityFile ||
@@ -218,7 +231,7 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 	if v := strings.TrimSpace(*newAuthMode); v != "" {
 		updated.AuthMode = v
 	}
-	if v := strings.TrimSpace(*newPassword); v != "" {
+	if v := *newPassword; v != "" {
 		updated.Password = v
 	}
 	if v := strings.TrimSpace(*newIdentityFile); v != "" {
@@ -234,7 +247,7 @@ func handleEditArgs(connectionFilePath, secretKeyFilePath string, args []string,
 	}
 	if *clearProxyJumpPassword {
 		updated.ProxyJumpPassword = ""
-	} else if v := strings.TrimSpace(*newProxyJumpPassword); v != "" {
+	} else if v := *newProxyJumpPassword; v != "" {
 		updated.ProxyJumpPassword = v
 	}
 	if *clearProxyJumpIdentityFile {

@@ -146,11 +146,11 @@ sshmanager add --host app.internal --username ubuntu --auth-mode agent --alias p
 sshmanager add --host db.internal --username root --auth-mode key --identity-file ~/.ssh/id_ed25519 --alias db
 sshmanager add --host app.internal --username ubuntu --auth-mode agent --group production --tag linux --tag api --alias prod
 sshmanager add --host app.internal --username ubuntu --auth-mode key --identity-file ~/.ssh/id_ed25519 --proxy-jump bastion.internal:2222 --local-forward 8080:127.0.0.1:80 --remote-forward 9000:127.0.0.1:9000 --extra-ssh-arg -vv --extra-ssh-arg -o --extra-ssh-arg ServerAliveInterval=30
-sshmanager add --host internal.example.com --username targetuser --auth-mode password --password TARGET_PASSWORD --proxy-jump jumpuser@bastion.example.com --proxy-jump-auth-mode password --proxy-jump-password JUMP_PASSWORD --alias internal-server
+sshmanager add --host internal.example.com --username targetuser --auth-mode password --proxy-jump jumpuser@bastion.example.com --proxy-jump-auth-mode password --alias internal-server
 ```
 
 When the jump host and the target host need different credentials (e.g. both
-require password auth), set `--proxy-jump-auth-mode`/`--proxy-jump-password`/
+require password auth), set `--proxy-jump-auth-mode`/`--proxy-jump-password-stdin`/
 `--proxy-jump-identity-file` independently of the target host's own auth
 fields. If left unset, ProxyJump behaves as before (passed through natively
 to `ssh -J`, relying on the system's own key/agent/ssh_config for the hop).
@@ -158,6 +158,20 @@ A dedicated jump password or identity file is only supported for a single
 ProxyJump hop.
 
 #### Edit saved connections
+
+Password mode without a supplied secret prompts without echo. For automation:
+
+```bash
+printf '%s\n' "$PASSWORD" | sshmanager add --host prod.example.com --username ubuntu --auth-mode password --password-stdin --alias prod
+sshmanager edit --alias prod --new-password-fd 3 3< /secure/password-file
+```
+
+Input consumes one line, preserves spaces, and strips a trailing CR in CRLF input.
+Use separate descriptors when supplying both target and jump secrets; inherited
+secret descriptors are closed after reading. No password-value environment variable
+is used for these CLI inputs. Password authentication still uses short-lived,
+child-scoped `SSHPASS` / jump-password environment channels at execution time;
+these do not protect against processes running as the same user or root.
 
 ```bash
 sshmanager edit --alias prod --new-host new.internal --new-port 2222
@@ -244,19 +258,34 @@ Import modes:
 
 #### Back up and restore
 
-Create a recovery backup containing connections and optional configuration:
+Create a passphrase-encrypted recovery backup containing connections and optional configuration. The terminal prompts for a passphrase and confirmation. Keep that passphrase separately: the installation keyring cannot recover it.
 
 ```bash
-sshmanager backup --out ./snapshot.yaml --format yaml
-sshmanager backup --out ./snapshot.json --format json --include-config=false
+sshmanager backup --out ./snapshot.sshm
+sshmanager backup --out ./snapshot.sshm --format json --include-config=false
 ```
 
 Restore from a recovery backup:
 
 ```bash
-sshmanager restore --in ./snapshot.yaml --mode merge
-sshmanager restore --in ./snapshot.json --mode replace --with-config=true
+sshmanager restore --in ./snapshot.sshm --mode merge
+sshmanager restore --in ./snapshot.sshm --mode replace --with-config=true
 ```
+
+Automation can use `--passphrase-stdin` or `--passphrase-fd N` on both commands.
+Backups use a versioned AES-256-GCM envelope with an authenticated header,
+a random salt/nonce, and PBKDF2-SHA256 (600,000 iterations). They do not depend
+on the source installation's encryption key and can be restored on another machine.
+The encrypted payload retains the selected YAML/JSON format. Restore accepts files
+up to 64 MiB and continues to support existing plaintext backups/exports.
+
+Plaintext recovery snapshots require an explicit unsafe choice:
+
+```bash
+sshmanager backup --out ./snapshot.yaml --plaintext
+```
+
+`export` remains a plaintext interoperability command. Protect those files separately.
 
 Restore modes:
 
@@ -375,8 +404,8 @@ After the checkpoint, recovery completes the committed restore.
 Do not delete `key-storage.yaml`: it identifies this installation's keyring entry and
 contains recovery state. A missing key for existing encrypted data is an error; the
 application will not create a replacement. Restore the original key and state, or
-restore a recovery backup into a fresh installation. Backups/exports retain their
-existing plaintext format and must be protected accordingly. They do not include
+restore a recovery backup into a fresh installation. Backups are passphrase-encrypted by default. Exports and `backup --plaintext`
+contain plaintext secrets and must be protected separately. Neither includes
 the encryption key or installation-specific keyring/recovery state.
 
 Before using an older SSH Manager binary, switch to `file` and stop all running
@@ -488,14 +517,24 @@ make vet
 make lint
 ```
 
+SSH invocation hardening rejects leading-option destinations, shell syntax in
+host/user/jump fields, and executable OpenSSH hooks in extra options. Extra `-o`
+options now use an allowlist of connection, authentication, keepalive, logging,
+host-key, and session settings; unsupported saved options fail before execution.
+SSH/SCP use explicit option separators. SCP local paths containing colons remain
+local, and remote paths with whitespace or shell metacharacters are rejected for
+compatibility with legacy SCP's remote shell. `exec` command strings are intentionally
+interpreted by the remote shell. The user's OpenSSH configuration and executables
+remain trusted; see [execution and backup boundaries](docs/security-boundaries.md).
+
 ## Security notes
 
 - Connection data is encrypted at rest using AES-GCM.
-- Backups and exports contain plaintext connection data, including saved passwords; protect these files separately.
+- Backups are passphrase-encrypted by default. Exports and `backup --plaintext` include plaintext passwords.
 - Key files are validated and stored with restrictive permissions.
 - OS keyring mode avoids storing the raw encryption key alongside encrypted connections.
 - Password-mode connections pass passwords to `sshpass` via environment variable (`SSHPASS`) instead of CLI args.
-- Passwords supplied to `add --password` or `edit --new-password` can appear in shell history and process arguments. Use the guided TUI forms to enter passwords without putting them on the command line.
+- Password input uses hidden terminal prompts, `--password-stdin`, or `--password-fd N`. Edit uses the `--new-password-*` names; jump credentials use `--proxy-jump-password-*` / `--new-proxy-jump-password-*`. The old argument flags are removed. Explicit `*-unsafe` flags retain argument-based input and expose secrets to process inspection and shell history.
 - Key/agent modes use OpenSSH directly (no `sshpass` dependency at runtime).
 - Optional master passphrase mode derives encryption keys from `SSHMANAGER_MASTER_PASSPHRASE`.
 - State file writes use atomic temp-write + rename flow.

@@ -26,7 +26,7 @@ func TestPrintUsageUsesSubcommandsWithoutDashes(t *testing.T) {
 		"  list [flags]",
 		"  export --out <path> [--format yaml|json]",
 		"  import --in <path> [--format auto|yaml|json] [--mode merge|replace]",
-		"  backup --out <path> [--format yaml|json] [--include-config=true|false]",
+		"  backup --out <path> [--format yaml|json] [--include-config=true|false] [--passphrase-stdin | --passphrase-fd N] [--plaintext]",
 		"  restore --in <path> [--format auto|yaml|json] [--mode merge|replace] [--with-config=true|false]",
 		"  doctor [--json]",
 		"  clean",

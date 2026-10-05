@@ -237,14 +237,14 @@ func TestRunBackupAndRestoreSubcommands(t *testing.T) {
 		"--host", "app.internal",
 		"--username", "ubuntu",
 		"--auth-mode", model.AuthModePassword,
-		"--password", "secret",
+		"--password-unsafe", "secret",
 		"--alias", "prod",
 	}, BuildInfo{}); err != nil {
 		t.Fatalf("Run(add) returned error: %v", err)
 	}
 
 	backupPath := filepath.Join(t.TempDir(), "backup.yaml")
-	if err := Run([]string{"sshmanager", "backup", "--out", backupPath, "--format", "yaml"}, BuildInfo{}); err != nil {
+	if err := Run([]string{"sshmanager", "backup", "--plaintext", "--out", backupPath, "--format", "yaml"}, BuildInfo{}); err != nil {
 		t.Fatalf("Run(backup) returned error: %v", err)
 	}
 

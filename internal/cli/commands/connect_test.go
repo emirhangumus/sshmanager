@@ -33,7 +33,7 @@ func TestBuildConnectInvocationPasswordMode(t *testing.T) {
 	if bin != "sshpass" {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
-	wantArgs := []string{"-e", "ssh", "-p", "22", "ubuntu@example.com"}
+	wantArgs := []string{"-e", "ssh", "-p", "22", "--", "ubuntu@example.com"}
 	assertStringSliceEqual(t, args, wantArgs)
 	assertStringSliceEqual(t, env, []string{"SSHPASS=secret"})
 }
@@ -55,7 +55,7 @@ func TestBuildConnectInvocationKeyMode(t *testing.T) {
 	if bin != "ssh" {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
-	wantArgs := []string{"-p", "2222", "-i", identityFile, "ubuntu@example.com"}
+	wantArgs := []string{"-p", "2222", "-i", identityFile, "--", "ubuntu@example.com"}
 	assertStringSliceEqual(t, args, wantArgs)
 	if len(env) != 0 {
 		t.Fatalf("expected no extra env for key mode, got %v", env)
@@ -90,7 +90,7 @@ func TestBuildConnectInvocationWithAdvancedOptions(t *testing.T) {
 		"-R", "9000:127.0.0.1:9000",
 		"-vv",
 		"-o", "ServerAliveInterval=30",
-		"ubuntu@example.com",
+		"--", "ubuntu@example.com",
 	}
 	assertStringSliceEqual(t, args, wantArgs)
 	if len(env) != 0 {
@@ -112,7 +112,7 @@ func TestBuildConnectInvocationAgentMode(t *testing.T) {
 	if bin != "ssh" {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
-	wantArgs := []string{"-p", "22", "ubuntu@example.com"}
+	wantArgs := []string{"-p", "22", "--", "ubuntu@example.com"}
 	assertStringSliceEqual(t, args, wantArgs)
 	if len(env) != 0 {
 		t.Fatalf("expected no extra env for agent mode, got %v", env)
@@ -133,7 +133,7 @@ func TestBuildConnectInvocationLegacyFallback(t *testing.T) {
 	if bin != "sshpass" {
 		t.Fatalf("expected legacy password fallback to sshpass, got %q", bin)
 	}
-	wantArgs := []string{"-e", "ssh", "-p", "22", "ubuntu@example.com"}
+	wantArgs := []string{"-e", "ssh", "-p", "22", "--", "ubuntu@example.com"}
 	assertStringSliceEqual(t, args, wantArgs)
 }
 
@@ -238,11 +238,11 @@ func TestBuildConnectInvocationProxyJumpPassword(t *testing.T) {
 		t.Fatalf("unexpected binary: %q", bin)
 	}
 
-	wantProxyCommand := `SSHPASS="$SSHMANAGER_PROXY_JUMP_SSHPASS" sshpass -e ssh -p '2222' -W %h:%p 'jumpuser@bastion.example.com'`
+	wantProxyCommand := `SSHPASS="$SSHMANAGER_PROXY_JUMP_SSHPASS" sshpass -e ssh -p '2222' -W '%h:%p' 'jumpuser@bastion.example.com'`
 	wantArgs := []string{
 		"-e", "ssh", "-p", "22",
 		"-o", "ProxyCommand=" + wantProxyCommand,
-		"ubuntu@internal.example.com",
+		"--", "ubuntu@internal.example.com",
 	}
 	assertStringSliceEqual(t, args, wantArgs)
 	assertStringSliceEqual(t, env, []string{
@@ -282,11 +282,11 @@ func TestBuildConnectInvocationProxyJumpIdentityFileOnly(t *testing.T) {
 		t.Fatalf("expected no env for identity-only proxy jump, got %v", env)
 	}
 
-	wantProxyCommand := "ssh -i '" + jumpIdentity + "' -W %h:%p 'jumpuser@bastion.example.com'"
+	wantProxyCommand := "ssh -i '" + jumpIdentity + "' -W '%h:%p' 'jumpuser@bastion.example.com'"
 	wantArgs := []string{
 		"-p", "22", "-i", targetIdentity,
 		"-o", "ProxyCommand=" + wantProxyCommand,
-		"ubuntu@internal.example.com",
+		"--", "ubuntu@internal.example.com",
 	}
 	assertStringSliceEqual(t, args, wantArgs)
 }

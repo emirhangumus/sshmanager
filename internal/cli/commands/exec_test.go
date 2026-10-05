@@ -57,17 +57,17 @@ func TestBuildExecInvocation(t *testing.T) {
 			conn: model.SSHConnection{Username: "ubuntu", Host: "example.com", AuthMode: model.AuthModeAgent,
 				ProxyJump: "jump.internal:2222", LocalForwards: []string{"8080:127.0.0.1:80"},
 				RemoteForwards: []string{"9000:127.0.0.1:9000"}, ExtraSSHArgs: []string{"-vv"}},
-			wantBin: "ssh", wantArgs: []string{"-p", "22", "-J", "jump.internal:2222", "-vv", "-T", "ubuntu@example.com", "echo ok"},
+			wantBin: "ssh", wantArgs: []string{"-p", "22", "-J", "jump.internal:2222", "-vv", "-T", "--", "ubuntu@example.com", "echo ok"},
 		},
 		{
 			name:    "key",
 			conn:    model.SSHConnection{Username: "ubuntu", Host: "example.com", Port: 2222, AuthMode: model.AuthModeKey, IdentityFile: identity},
-			wantBin: "ssh", wantArgs: []string{"-p", "2222", "-i", identity, "-T", "ubuntu@example.com", "echo ok"},
+			wantBin: "ssh", wantArgs: []string{"-p", "2222", "-i", identity, "-T", "--", "ubuntu@example.com", "echo ok"},
 		},
 		{
 			name:    "password",
 			conn:    model.SSHConnection{Username: "ubuntu", Host: "example.com", AuthMode: model.AuthModePassword, Password: "secret"},
-			wantBin: "sshpass", wantArgs: []string{"-e", "ssh", "-p", "22", "-T", "ubuntu@example.com", "echo ok"},
+			wantBin: "sshpass", wantArgs: []string{"-e", "ssh", "-p", "22", "-T", "--", "ubuntu@example.com", "echo ok"},
 			wantEnv: []string{"SSHPASS=secret"},
 		},
 	}
@@ -112,13 +112,13 @@ func TestRunExecStreamsAndPreservesExitStatus(t *testing.T) {
 	writeFakeExecutable(t, path, fake)
 	t.Setenv("PATH", filepath.Dir(path)+string(os.PathListSeparator)+os.Getenv("PATH"))
 	var stdout, stderr strings.Builder
-	err := runExec("ssh", []string{"-T", "ubuntu@example.com", "echo ok"}, nil,
+	err := runExec("ssh", []string{"-T", "--", "ubuntu@example.com", "echo ok"}, nil,
 		&model.SSHConnection{Host: "example.com"}, strings.NewReader("script body\n"), &stdout, &stderr)
 	var exitErr *ExecExitError
 	if !errors.As(err, &exitErr) || exitErr.Code != 37 || exitErr.Detail != "" {
 		t.Fatalf("runExec error = %v, want bare exit status 37", err)
 	}
-	if got := stdout.String(); got != "args:-T ubuntu@example.com echo ok\ninput:script body\n" {
+	if got := stdout.String(); got != "args:-T -- ubuntu@example.com echo ok\ninput:script body\n" {
 		t.Fatalf("stdout = %q", got)
 	}
 	if got := stderr.String(); got != "remote warning\n" {
@@ -147,7 +147,7 @@ func TestRunExecPasswordUsesEnvironmentAndStreamsStdin(t *testing.T) {
 	if err := runExec(bin, args, env, conn, strings.NewReader("echo script\n"), &stdout, &stderr); err != nil {
 		t.Fatal(err)
 	}
-	if got := stdout.String(); got != "password:secret\nargs:-e ssh -p 22 -T ubuntu@example.com sh -s\necho script\n" {
+	if got := stdout.String(); got != "password:secret\nargs:-e ssh -p 22 -T -- ubuntu@example.com sh -s\necho script\n" {
 		t.Fatalf("stdout = %q", got)
 	}
 	if strings.Contains(strings.Join(args, " "), "secret") {
@@ -182,7 +182,7 @@ func TestHandleExecArgsCommandAndScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != "-p 22 -T ubuntu@example.com echo 'hello world'\n" {
+	if string(got) != "-p 22 -T -- ubuntu@example.com echo 'hello world'\n" {
 		t.Fatalf("command invocation = %q", got)
 	}
 
@@ -197,7 +197,7 @@ func TestHandleExecArgsCommandAndScript(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-	if string(got) != "-p 22 -T ubuntu@example.com bash -s\necho scripted\n" {
+	if string(got) != "-p 22 -T -- ubuntu@example.com bash -s\necho scripted\n" {
 		t.Fatalf("script invocation = %q", got)
 	}
 }

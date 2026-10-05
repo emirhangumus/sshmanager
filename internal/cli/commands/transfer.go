@@ -309,6 +309,9 @@ func normalizeImportedConnection(conn model.SSHConnection) (model.SSHConnection,
 	if conn.Port < 0 || conn.Port > 65535 {
 		return model.SSHConnection{}, fmt.Errorf("imported connection has invalid port %d", conn.Port)
 	}
+	if err := model.ValidateSSHTarget(conn.Username, conn.Host, conn.Port); err != nil {
+		return model.SSHConnection{}, err
+	}
 	if err := model.ValidateProxyJump(conn.ProxyJump); err != nil {
 		return model.SSHConnection{}, fmt.Errorf("imported connection has invalid proxyJump: %w", err)
 	}

@@ -2,6 +2,7 @@ package model
 
 import (
 	"fmt"
+	"net"
 	"regexp"
 	"strconv"
 	"strings"
@@ -11,6 +12,8 @@ var (
 	proxyJumpHopPattern = regexp.MustCompile(`^(?:([^@\s,]+)@)?(\[[^\]\s,]+\]|[^:@\s,]+)(?::(\d{1,5}))?$`)
 	forwardSpecPattern  = regexp.MustCompile(`^(?:([^:\s]+):)?(\d{1,5}):([^:\s]+|\[[^\]\s]+\]):(\d{1,5})$`)
 	sshOptionKeyPattern = regexp.MustCompile(`^[A-Za-z][A-Za-z0-9]*$`)
+	sshUsernamePattern  = regexp.MustCompile(`^[A-Za-z0-9_.+\\-]+$`)
+	sshHostPattern      = regexp.MustCompile(`^[A-Za-z0-9_.-]+$`)
 )
 
 var allowedStandaloneExtraSSHArgs = map[string]struct{}{
@@ -33,17 +36,6 @@ var allowedStandaloneExtraSSHArgs = map[string]struct{}{
 	"-X":   {},
 	"-x":   {},
 	"-Y":   {},
-}
-
-var blockedExtraSSHOptionKeys = map[string]struct{}{
-	"identityfile":       {},
-	"localcommand":       {},
-	"localforward":       {},
-	"permitlocalcommand": {},
-	"port":               {},
-	"proxycommand":       {},
-	"proxyjump":          {},
-	"remoteforward":      {},
 }
 
 func NormalizeStringList(values []string) []string {
@@ -102,6 +94,14 @@ func ParseProxyJumpHop(hop string) (user, host, port string, err error) {
 
 	user = matches[1]
 	host = matches[2]
+	if err := ValidateSSHHost(host); err != nil {
+		return "", "", "", err
+	}
+	if user != "" {
+		if err := ValidateSSHTarget(user, host, 0); err != nil {
+			return "", "", "", err
+		}
+	}
 	port = matches[3]
 	if port != "" {
 		p, convErr := strconv.Atoi(port)
@@ -136,6 +136,14 @@ func ValidateForwardSpec(spec string) error {
 		return fmt.Errorf("invalid forward spec %q, expected [bind_address:]port:host:hostport", trimmed)
 	}
 
+	if matches[1] != "" && matches[1] != "*" {
+		if err := ValidateSSHHost(matches[1]); err != nil {
+			return err
+		}
+	}
+	if err := ValidateSSHHost(matches[3]); err != nil {
+		return err
+	}
 	localPort, err := strconv.Atoi(matches[2])
 	if err != nil || localPort < 1 || localPort > 65535 {
 		return fmt.Errorf("invalid local port in forward spec %q", trimmed)
@@ -181,7 +189,7 @@ func ValidateExtraSSHArgs(args []string) error {
 }
 
 func validateSSHOptionToken(option string) error {
-	key, _, ok := strings.Cut(strings.TrimSpace(option), "=")
+	key, value, ok := strings.Cut(strings.TrimSpace(option), "=")
 	if !ok {
 		return fmt.Errorf("ssh option %q must be in key=value format", option)
 	}
@@ -191,9 +199,55 @@ func validateSSHOptionToken(option string) error {
 		return fmt.Errorf("ssh option key %q is invalid", key)
 	}
 
-	if _, blocked := blockedExtraSSHOptionKeys[strings.ToLower(key)]; blocked {
-		return fmt.Errorf("ssh option %q is not allowed in extra args", key)
+	if strings.ContainsAny(value, "\x00\r\n") {
+		return fmt.Errorf("SSH option contains a control character")
+	}
+	// An allowlist prevents executable hooks and config-file loading escapes.
+	allowed := map[string]bool{
+		"serveraliveinterval": true, "serveralivecountmax": true, "connecttimeout": true,
+		"connectionattempts": true, "compression": true, "loglevel": true,
+		"stricthostkeychecking": true, "userknownhostsfile": true, "globalknownhostsfile": true,
+		"forwardagent": true, "forwardx11": true, "forwardx11trusted": true,
+		"batchmode": true, "identitiesonly": true, "preferredauthentications": true,
+		"passwordauthentication": true, "pubkeyauthentication": true, "kbdinteractiveauthentication": true,
+		"requesttty": true, "stdinnull": true, "sessiontype": true, "forkafterauthentication": true,
+		"tcpkeepalive": true, "addressfamily": true, "exitonforwardfailure": true,
+	}
+	if !allowed[strings.ToLower(key)] {
+		return fmt.Errorf("SSH option %q is not supported in extra args", key)
 	}
 
+	return nil
+}
+
+// ValidateSSHTarget restricts values OpenSSH may substitute into shell commands.
+func ValidateSSHTarget(username, host string, port int) error {
+	if username == "" || strings.HasPrefix(username, "-") || !sshUsernamePattern.MatchString(username) {
+		return fmt.Errorf("invalid SSH username")
+	}
+	if err := ValidateSSHHost(host); err != nil {
+		return err
+	}
+	if port < 0 || port > 65535 {
+		return fmt.Errorf("invalid SSH port")
+	}
+	return nil
+}
+
+// ValidateSSHHost accepts DNS names, SSH aliases, and IP addresses.
+func ValidateSSHHost(host string) error {
+	ip := host
+	if strings.HasPrefix(host, "[") || strings.HasSuffix(host, "]") {
+		if !strings.HasPrefix(host, "[") || !strings.HasSuffix(host, "]") {
+			return fmt.Errorf("invalid bracketed SSH host")
+		}
+		ip = host[1 : len(host)-1]
+	}
+	if net.ParseIP(ip) != nil {
+		return nil
+	}
+	if host == "" || strings.HasPrefix(host, "-") || !sshHostPattern.MatchString(host) {
+		return fmt.Errorf("invalid SSH host")
+	}
 	return nil
 }
